@@ -32,5 +32,8 @@ bin/*
 # Debug files
 *.dSYM/
 
+# Memwatch files
+memwatch.log
+
 # YCM files
 .ycm_extra_conf.pyc

@@ -21,6 +21,7 @@ clean:
 		$(BINSDIR)/{procnanny,procnanny_debug}
 
 $(BINSDIR)/procnanny: $(OBJS)
+	@mkdir $(BINSDIR)
 	$(CC) $(CFLAGS) $(OBJS) -o $@
 
 $(OBJS): $(SRCS)
@@ -28,6 +29,7 @@ $(OBJS): $(SRCS)
 	-mv *.o $(SRCSDIR)
 
 $(BINSDIR)/procnanny_debug: debug_objs
+	@mkdir $(BINSDIR)
 	$(CC) $(CFLAGS) $(OBJS) -o $@
 
 debug_objs: $(SRCS)

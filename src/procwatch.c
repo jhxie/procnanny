@@ -3,14 +3,16 @@
 #include <stdio.h>
 #include <inttypes.h>
 
-#define PW_ONLY
 
 #include "castack.h"
 #include "procwatch.h"
+
+#define PW_ONLY
 #include "pwutils.h"
+#undef PW_ONLY
+
 #include "memwatch.h"
 
-#undef PW_ONLY
 
 static struct castack *memstack = NULL;
 
