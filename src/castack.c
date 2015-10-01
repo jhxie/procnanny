@@ -32,11 +32,12 @@ struct castack {
 
 struct node_ {
     void *memblk;
+    size_t blksize;
     link next;
 };
 
 /*
- *The convetions used here is "head pointer, null tail"
+ *The conventions used here is "head pointer, null tail"
  *Concept coming from Robert Sedgewick
  */
 struct castack *castack_init(void)
@@ -52,9 +53,9 @@ void *castack_push(struct castack *current_castack, size_t nmemb, size_t size)
 {
         castack_pushnode_(current_castack);
         // lastly allocate space for the memblk field of new node
-        current_castack->head->memblk = calloc_or_die_(nmemb, size);
+        current_castack->head->blksize = nmemb * size;
 
-        return current_castack->head->memblk;
+        return current_castack->head->memblk = calloc_or_die_(nmemb, size);
 }
 
 void *castack_realloc(struct castack *current_castack, void *mem, size_t size)
@@ -68,6 +69,7 @@ void *castack_realloc(struct castack *current_castack, void *mem, size_t size)
         if (mem == NULL) {
                 castack_pushnode_(current_castack);
                 current_castack->head->memblk = realloc_or_die_(mem, size);
+                current_castack->head->blksize = size;
                 return memset(current_castack->head->memblk, 0, size);
         }
 
@@ -82,12 +84,30 @@ void *castack_realloc(struct castack *current_castack, void *mem, size_t size)
 
         // if the address passed does not happen to be on the castack
         if (tmp_ptr == NULL) {
-                castack_pushnode_(current_castack);
-                current_castack->head->memblk = mem;
-                tmp_ptr = current_castack->head;
+                goto castack_realloc_exit;
+        } else if (size == 0) {
+                /*
+                 *"if size is equal to zero, and ptr is not NULL, then the call
+                 *is equivalent to free(ptr)"
+                 */
+                free(tmp_ptr->memblk);
+                tmp_ptr->memblk = NULL;
+        } else if (tmp_ptr->blksize >= size) {
+                /*
+                 *if the old block size is greater than the new block size,
+                 *we do not need to worry about anything else
+                 */
+                tmp_ptr->memblk = realloc_or_die_(tmp_ptr->memblk, size);
+        } else {
+                tmp_ptr->memblk = realloc_or_die_(tmp_ptr->memblk, size);
+                memset(tmp_ptr->memblk + tmp_ptr->blksize,
+                       0,
+                       size - tmp_ptr->blksize);
         }
+        tmp_ptr->blksize = size;
 
-        return tmp_ptr->memblk = realloc_or_die_(tmp_ptr->memblk, size);
+castack_realloc_exit:
+        return tmp_ptr->memblk;
 }
 
 void castack_pop(struct castack *current_castack)
@@ -195,6 +215,7 @@ static void castack_pushnode_(struct castack *current_castack)
         // let the head node pointer point to the new node
         current_castack->head = memblk_ptr;
         current_castack->head->memblk = NULL;
+        current_castack->head->blksize = 0;
         current_castack->numblk++;
 }
 
