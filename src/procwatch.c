@@ -1,9 +1,9 @@
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <inttypes.h>
-
+#include <unistd.h>
 
 #include "castack.h"
 #include "procwatch.h"
@@ -14,7 +14,6 @@
 
 #include "memwatch.h"
 
-
 static struct castack *memstack = NULL;
 
 void procwatch(int argc, char **argv)
@@ -22,6 +21,7 @@ void procwatch(int argc, char **argv)
         memstack = castack_init();
         PW_MEMSTACK_ENABLE_AUTO_CLEAN();
         struct pw_config_info info;
+        unsigned wait_threshold = 0;
 
         while (true) {
                 info = config_parse(argc, argv);
@@ -31,6 +31,7 @@ void procwatch(int argc, char **argv)
                         break;
                 case PW_WAIT_THRESHOLD:
                         printf("%d\n", info.data.wait_threshold);
+                        wait_threshold = info.data.wait_threshold;
                         break;
                 case PW_END_FILE:
                         goto procwatch_loop_exit;
