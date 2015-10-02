@@ -20,8 +20,9 @@ clean:
 	-rm -f $(SRCSDIR)/*.o $(SRCSDIR)/*.gch \
 		$(BINSDIR)/{procnanny,procnanny_debug}
 
+# -p option stops directory already exist error
 $(BINSDIR)/procnanny: $(OBJS)
-	@mkdir $(BINSDIR)
+	@mkdir -p $(BINSDIR)
 	$(CC) $(CFLAGS) $(OBJS) -o $@
 
 $(OBJS): $(SRCS)
@@ -29,7 +30,7 @@ $(OBJS): $(SRCS)
 	-mv *.o $(SRCSDIR)
 
 $(BINSDIR)/procnanny_debug: debug_objs
-	@mkdir $(BINSDIR)
+	@mkdir -p $(BINSDIR)
 	$(CC) $(CFLAGS) $(OBJS) -o $@
 
 debug_objs: $(SRCS)
