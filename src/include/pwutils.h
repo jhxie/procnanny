@@ -16,8 +16,6 @@
         } \
 } while (0)
 
-enum { LINEBUF_SIZE = 1024 };
-
 static struct pw_config_info config_parse(int argc, char **argv);
 static unsigned config_parse_threshold(FILE *const nanny_cfg);
 static char *config_parse_pname(const char *const nanny_cfg_name);

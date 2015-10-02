@@ -14,6 +14,7 @@
 
 #include "memwatch.h"
 
+enum { PW_LINEBUF_SIZE = 1024 };
 static struct castack *memstack = NULL;
 
 void procwatch(int argc, char **argv)
@@ -90,13 +91,13 @@ static unsigned config_parse_threshold(FILE *const nanny_cfg)
          *something like getline() is that memwatch cannot detect the memory
          *allocated by getline()
          */
-        char linebuf[LINEBUF_SIZE] = {};
+        char linebuf[PW_LINEBUF_SIZE] = {};
         // dummy variable, since the case is ignored
         // where the first line is not a valid number
         char *endptr = NULL;
         unsigned wait_period = 0;
 
-        if (NULL != fgets(linebuf, LINEBUF_SIZE, nanny_cfg)) {
+        if (NULL != fgets(linebuf, PW_LINEBUF_SIZE, nanny_cfg)) {
                 /*From Assignment #1 Description:
                  *"The first line is an integer number indicating how
                  * many seconds procnanny will run for."
@@ -133,7 +134,7 @@ static unsigned config_parse_threshold(FILE *const nanny_cfg)
  */
 static char *config_parse_pname(const char *const nanny_cfg_name)
 {
-        static char   line_buf[LINEBUF_SIZE];
+        static char   line_buf[PW_LINEBUF_SIZE];
         static bool   in_file                 = false;
         static char   *tmp_fname              = "sed_filter_tmp";
         static fpos_t pos;
