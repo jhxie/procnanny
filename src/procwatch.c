@@ -20,20 +20,25 @@ static struct castack *memstack = NULL;
 void procwatch(int argc, char **argv)
 {
         memstack = castack_init();
+        PW_MEMSTACK_ENABLE_AUTO_CLEAN();
+        struct pw_config_info info;
 
-        if (atexit(clean_up) != 0) {
-                eprintf("atexit(): cannot set exit function\n");
-                /*
-                 *note this is the only explicit call of castack_destroy():
-                 *for all the other cases castack_destroy() is guaranteed
-                 *to be called upon exit()
-                 */
-                castack_destroy(&memstack);
-                exit(EXIT_FAILURE);
+        while (true) {
+                info = config_parse(argc, argv);
+                switch (info.type) {
+                case PW_PROCESS_NAME:
+                        printf("%s\n", info.data.process_name);
+                        break;
+                case PW_WAIT_THRESHOLD:
+                        printf("%d\n", info.data.wait_threshold);
+                        break;
+                case PW_END_FILE:
+                        goto procwatch_loop_exit;
+                        break;
+                }
         }
-
-        config_parse(argc, argv);
-
+procwatch_loop_exit:
+        ;
 }
 
 
@@ -44,21 +49,36 @@ void procwatch(int argc, char **argv)
  *This function simply checks the validty of argument vectors and returns a
  *FILE * on success; otherwise quit the whole program.
  */
-static void config_parse(int argc, char **argv)
+static struct pw_config_info config_parse(int argc, char **argv)
 {
+        static bool parsing_threshold = true;
+        static struct pw_config_info info;
+
+        if (false == parsing_threshold) {
+                info.type = PW_PROCESS_NAME;
+                goto config_parse_line_return;
+        } else {
+                parsing_threshold = false;
+                info.type = PW_WAIT_THRESHOLD;
+        }
+
         if (argc != 2) {
                 eprintf("Usage: %s [FILE]\n", argv[0]);
                 exit(EXIT_FAILURE);
         }
 
         FILE *nanny_cfg = NULL;
-        const char *line = NULL;
-
         nanny_cfg = fopen_or_die(argv[1], "r");
-        printf("%u\n", config_parse_threshold(nanny_cfg));
-        while (NULL != (line = config_parse_pname(argv[1])))
-                printf("%s\n", line);
+        info.data.wait_threshold = config_parse_threshold(nanny_cfg);
         fclose_or_die(nanny_cfg);
+        return info;
+
+config_parse_line_return:
+        while (NULL != (info.data.process_name = config_parse_pname(argv[1])))
+                return info;
+
+        info.type = PW_END_FILE;
+        return info;
 }
 
 static unsigned config_parse_threshold(FILE *const nanny_cfg)
@@ -81,20 +101,35 @@ static unsigned config_parse_threshold(FILE *const nanny_cfg)
                  * many seconds procnanny will run for."
                  */
                 uintmax_t tmp = strtoumax(linebuf, &endptr, 10);
+                if (0 == tmp && linebuf == endptr) {
+                        eprintf("strtoumax() : "
+                                "the first line is not a valid number\n");
+                        fclose_or_die(nanny_cfg);
+                        exit(EXIT_FAILURE);
+                }
                 wait_period = tmp;
                 if (wait_period != tmp) {
-                        eprintf("Number of seconds to wait "
+                        eprintf("strtoumax() : "
+                                "number of seconds to wait "
                                 "exceeds the capacity of an "
                                 "unsigned integer\n");
+                        fclose_or_die(nanny_cfg);
                         exit(EXIT_FAILURE);
                 }
         } else {
                 eprintf("The first line does not contain a valid number\n");
+                fclose_or_die(nanny_cfg);
                 exit(EXIT_FAILURE);
         }
         return wait_period;
 }
 
+/*
+ *This function receives a file name of the configuraiton file and returns
+ *a pointer to each line of the file on each subsequent calls until either
+ *EOF is reached or an error occurred.
+ *Note: this function will _not_ close the FILE *nanny_cfg on error
+ */
 static char *config_parse_pname(const char *const nanny_cfg_name)
 {
         static char   line_buf[LINEBUF_SIZE];
@@ -125,7 +160,7 @@ static char *config_parse_pname(const char *const nanny_cfg_name)
                         "while executing child process");
                 exit(EXIT_FAILURE);
         }
-        //castack_pop(memstack);
+        castack_pop(memstack);
 
 parse_continue:
         sed_filter_file = fopen_or_die(tmp_fname, "r");
