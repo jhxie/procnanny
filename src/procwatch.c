@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <inttypes.h>
 
 
@@ -27,13 +28,14 @@ void procwatch(int argc, char **argv)
                  *for all the other cases castack_destroy() is guaranteed
                  *to be called upon exit()
                  */
-                castack_destroy(memstack);
+                castack_destroy(&memstack);
                 exit(EXIT_FAILURE);
         }
 
         config_parse(argc, argv);
 
 }
+
 
 /*
  *According to the assignment specification,
@@ -50,69 +52,144 @@ static void config_parse(int argc, char **argv)
         }
 
         FILE *nanny_cfg = NULL;
+        const char *line = NULL;
 
-        if ((nanny_cfg = fopen(argv[1], "r")) == NULL) {
-                eprintf("%s: missing file operand\n", argv[0]);
+        nanny_cfg = fopen_or_die(argv[1], "r");
+        printf("%u\n", config_parse_threshold(nanny_cfg));
+        while (NULL != (line = config_parse_pname(argv[1])))
+                printf("%s\n", line);
+        fclose_or_die(nanny_cfg);
+}
+
+static unsigned config_parse_threshold(FILE *const nanny_cfg)
+{
+        /*
+         *ASSUMPTION: the length of a line is no more than 1023 characters
+         *the reason for using a statically allocated array rather than
+         *something like getline() is that memwatch cannot detect the memory
+         *allocated by getline()
+         */
+        char linebuf[LINEBUF_SIZE] = {};
+        // dummy variable, since the case is ignored
+        // where the first line is not a valid number
+        char *endptr = NULL;
+        unsigned wait_period = 0;
+
+        if (NULL != fgets(linebuf, LINEBUF_SIZE, nanny_cfg)) {
+                /*From Assignment #1 Description:
+                 *"The first line is an integer number indicating how
+                 * many seconds procnanny will run for."
+                 */
+                uintmax_t tmp = strtoumax(linebuf, &endptr, 10);
+                wait_period = tmp;
+                if (wait_period != tmp) {
+                        eprintf("Number of seconds to wait "
+                                "exceeds the capacity of an "
+                                "unsigned integer\n");
+                        exit(EXIT_FAILURE);
+                }
+        } else {
+                eprintf("The first line does not contain a valid number\n");
+                exit(EXIT_FAILURE);
+        }
+        return wait_period;
+}
+
+static char *config_parse_pname(const char *const nanny_cfg_name)
+{
+        static char   line_buf[LINEBUF_SIZE];
+        static bool   in_file                 = false;
+        static char   *tmp_fname              = "sed_filter_tmp";
+        static fpos_t pos;
+        FILE          *sed_filter_file        = NULL;
+
+        if (true == in_file) {
+                goto parse_continue;
+        }
+
+        enum { SED_FILTER, NANNY_CFG_NAME, UNIQ_FILTER, TMP_FNAME};
+        const char *cmd_options[]     =
+        {"sed -n \'2,$p;$q\' ", nanny_cfg_name, " | uniq > ", tmp_fname};
+        size_t cat_str_size =
+                strlen(cmd_options[SED_FILTER])     +
+                strlen(cmd_options[NANNY_CFG_NAME]) +
+                strlen(cmd_options[UNIQ_FILTER])    +
+                strlen(cmd_options[TMP_FNAME])      + 1;
+        char *const       cmd_buffer  = castack_push(memstack, 1, cat_str_size);
+
+        for (size_t i = 0; i < sizeof cmd_options / sizeof cmd_options[0]; ++i)
+                strcat(cmd_buffer, cmd_options[i]);
+
+        if (-1 == system(cmd_buffer)) {
+                eprintf("system(): Error occurred "
+                        "while executing child process");
+                exit(EXIT_FAILURE);
+        }
+        //castack_pop(memstack);
+
+parse_continue:
+        sed_filter_file = fopen_or_die(tmp_fname, "r");
+        if (true == in_file) {
+                fsetpos_or_die(sed_filter_file, &pos);
+        } else {
+                in_file = true;
+        }
+                
+        if (NULL == fgets(line_buf, sizeof line_buf, sed_filter_file)) {
+                if (feof(sed_filter_file)) {
+                        fclose_or_die(sed_filter_file);
+                        return NULL;
+                } else {
+                        perror("fgets()");
+                        exit(EXIT_FAILURE);
+                }
+        }
+
+        fgetpos_or_die(sed_filter_file, &pos);
+        fclose_or_die(sed_filter_file);
+        line_buf[strlen(line_buf) - 1] = '\0';
+        return line_buf;
+}
+
+FILE *fopen_or_die(const char *path, const char *mode)
+{
+        FILE *file = fopen(path, mode);
+        if (NULL == file) {
                 perror("fopen()");
                 exit(EXIT_FAILURE);
         }
+        return file;
+}
 
-        config_parse_helper(nanny_cfg);
-
-        if (fclose(nanny_cfg) == EOF) {
+void fclose_or_die(FILE *stream)
+{
+        if (fclose(stream) == EOF) {
                 perror("fclose()");
                 exit(EXIT_FAILURE);
         }
 }
 
-static void config_parse_helper(FILE *const nanny_cfg)
+void fgetpos_or_die(FILE *stream, fpos_t *pos)
 {
-        bool firstline = true;
-
-        // dummy variable, since the case is ignored
-        // where the first line is not a valid number
-        char *endptr = NULL;
-
-        // this character is allocated by getline() automatically
-        char *lineptr = NULL;
-
-        // this variable is updated automatically by getline()
-        size_t linesize = 0;
-
-        ssize_t num_char_read = 0;
-        unsigned wait_period = 0;
-
-        while ((num_char_read = getline(&lineptr, &linesize, nanny_cfg))
-               != -1) {
-                /*From Assignment #1 Description:
-                 *"The first line is an integer number indicating how
-                 * many seconds procnanny will run for."
-                 */
-                if (firstline == true) {
-                        uintmax_t tmp = strtoumax(lineptr, &endptr, 10);
-                        wait_period = tmp;
-                        if (wait_period != tmp) {
-                                eprintf("Number of seconds to wait "
-                                        "exceeds the capacity of an "
-                                        "unsigned integer\n");
-                                exit(EXIT_FAILURE);
-                        }
-                        firstline = false;
-                }
-                /*
-                 *From Assignment #1 Description:
-                 *"Each of the other lines of the configuration file are strings
-                 * containing the names of programs."
-                 */
-                // TODO
+        if (0 != fgetpos(stream, pos)) {
+                perror("fgetpos()");
+                exit(EXIT_FAILURE);
         }
-        // checks whether getline() stops becuase of EOF
-        free(lineptr);
 }
+
+void fsetpos_or_die(FILE *stream, const fpos_t *pos)
+{
+        if (0 != fsetpos(stream, pos)) {
+                perror("fsetpos()");
+                exit(EXIT_FAILURE);
+        }
+}
+
 static void clean_up(void)
 {
-        castack_destroy(memstack);
+        castack_destroy(&memstack);
 }
+
         /*
         if (castack_empty(castack_ptr))
                 puts("It is empty!");

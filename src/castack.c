@@ -171,18 +171,6 @@ static void *calloc_or_die_(size_t nmemb, size_t size)
         }
 }
 
-static void *malloc_or_die_(size_t size)
-{
-        void *rtn_ptr = malloc(size);
-
-        if (rtn_ptr == NULL) {
-                perror("malloc()");
-                exit(EXIT_FAILURE);
-        } else {
-                return memset(rtn_ptr, 0, size);
-        }
-}
-
 static void *realloc_or_die_(void *const ptr, size_t size)
 {
         void *rtn_ptr = realloc(ptr, size);

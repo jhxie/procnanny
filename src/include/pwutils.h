@@ -3,8 +3,11 @@
 
 #include <stdio.h>
 
+enum { LINEBUF_SIZE = 1024 };
+
 static void config_parse(int argc, char **argv);
-static void config_parse_helper(FILE *const nanny_cfg);
+static unsigned config_parse_threshold(FILE *const nanny_cfg);
+static char *config_parse_pname(const char *const nanny_cfg_name);
 static inline void clean_up(void);
 
 #endif
