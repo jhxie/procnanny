@@ -19,6 +19,7 @@
 static struct pw_config_info config_parse(int argc, char **argv);
 static unsigned config_parse_threshold(FILE *const nanny_cfg);
 static char *config_parse_pname(const char *const nanny_cfg_name);
+static void work_dispatch(unsigned wait_threshold, const char *process_name);
 static inline void clean_up(void);
 
 #endif

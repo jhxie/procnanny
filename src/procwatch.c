@@ -1,9 +1,11 @@
 #include <errno.h>
 #include <inttypes.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "castack.h"
@@ -31,6 +33,7 @@ void procwatch(int argc, char **argv)
                 switch (info.type) {
                 case PW_PROCESS_NAME:
                         printf("%s\n", info.data.process_name);
+                        work_dispatch(wait_threshold, info.data.process_name);
                         break;
                 case PW_WAIT_THRESHOLD:
                         printf("%d\n", info.data.wait_threshold);
@@ -107,7 +110,7 @@ static unsigned config_parse_threshold(FILE *const nanny_cfg)
         char *endptr = NULL;
         unsigned wait_period = 0;
 
-        if (NULL != fgets(linebuf, PW_LINEBUF_SIZE, nanny_cfg)) {
+        if (NULL != fgets(linebuf, sizeof linebuf, nanny_cfg)) {
                 /*From Assignment #1 Description:
                  *"The first line is an integer number indicating how
                  * many seconds procnanny will run for."
@@ -177,9 +180,9 @@ static char *config_parse_pname(const char *const nanny_cfg_name)
                 strlen(cmd_options[NANNY_CFG_NAME]) +
                 strlen(cmd_options[UNIQ_FILTER])    +
                 strlen(cmd_options[TMP_FNAME])      + 1;
-        char *const       cmd_buffer  = castack_push(memstack, 1, cat_str_size);
+        char *cmd_buffer  = castack_push(memstack, 1, cat_str_size);
 
-        for (size_t i = 0; i < sizeof cmd_options / sizeof cmd_options[0]; ++i)
+        for (size_t i = SED_FILTER; i <= TMP_FNAME; ++i)
                 strcat(cmd_buffer, cmd_options[i]);
 
         if (-1 == system(cmd_buffer)) {
@@ -189,6 +192,7 @@ static char *config_parse_pname(const char *const nanny_cfg_name)
         }
         // optional, since PW_MEMSTACK_ENABLE_AUTO_CLEAN macro is present
         castack_pop(memstack);
+        cmd_buffer = NULL;
 
 parse_continue:
         sed_filter_file = fopen_or_die(tmp_fname, "r");
@@ -218,6 +222,47 @@ parse_continue:
         //fgets() leaves the newline character untouched, so kill it
         line_buf[strlen(line_buf) - 1] = '\0';
         return line_buf;
+}
+
+static void work_dispatch(unsigned wait_threshold, const char *process_name)
+{
+        /*
+         *ASSUMPTION: the length of a line is no more than 1023 characters
+         *(same as config_parse_threshold())
+         */
+        const char *const pgrep_filter = "pgrep ";
+        size_t cat_str_size = strlen(pgrep_filter) + strlen(process_name) + 1;
+        char *cmd_buffer = castack_push(memstack, 1, cat_str_size);
+        FILE *pgrep_pipe = NULL;
+
+        strcat(cmd_buffer, pgrep_filter);
+        strcat(cmd_buffer, process_name);
+
+        pgrep_pipe = popen_or_die(cmd_buffer, "r");
+        // again, this is optional
+        castack_pop(memstack);
+        cmd_buffer = NULL;
+
+        char linebuf[PW_LINEBUF_SIZE] = {};
+        char *endptr = NULL;
+        uintmax_t tmp = 0;
+        pid_t watched_process_id = 0;
+
+        while (NULL != fgets(linebuf, sizeof linebuf, pgrep_pipe)) {
+                tmp = strtoumax(linebuf, &endptr, 10);
+                watched_process_id = (pid_t)tmp;
+
+                switch (fork_or_die()) {
+                case 0:
+                        sleep(wait_threshold);
+                        kill(watched_process_id, SIGKILL);
+                        exit(EXIT_SUCCESS);
+                                break;
+                default:
+                                break;
+                }
+        }
+
 }
 
 static void clean_up(void)
