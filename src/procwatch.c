@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -7,6 +8,7 @@
 
 #include "castack.h"
 #include "procwatch.h"
+#include "pwwrapper.h"
 
 #define PW_ONLY
 #include "pwutils.h"
@@ -48,8 +50,12 @@ procwatch_loop_exit:
  *According to the assignment specification,
  *"The program procnanny takes exactly one command-line argument that specifies
  *the full pathname to a configuration file."
- *This function simply checks the validty of argument vectors and returns a
- *FILE * on success; otherwise quit the whole program.
+ *This function checks the validty of argument vectors and returns a
+ *pw_config_info structure that contains info of the config file on subsequent
+ *calls on success; otherwise quit the whole program.
+ *
+ *Note: this function dispatches its 2 kinds of work(threashold or process name)
+ *to 2 separate functions.
  */
 static struct pw_config_info config_parse(int argc, char **argv)
 {
@@ -58,7 +64,14 @@ static struct pw_config_info config_parse(int argc, char **argv)
 
         if (false == parsing_threshold) {
                 info.type = PW_PROCESS_NAME;
-                goto config_parse_line_return;
+
+                while (NULL !=
+                       (info.data.process_name = config_parse_pname(argv[1])))
+                        return info;
+
+                //if NULL is returned for the previous loop, we have a EOF
+                info.type = PW_END_FILE;
+                return info;
         } else {
                 parsing_threshold = false;
                 info.type = PW_WAIT_THRESHOLD;
@@ -74,15 +87,12 @@ static struct pw_config_info config_parse(int argc, char **argv)
         info.data.wait_threshold = config_parse_threshold(nanny_cfg);
         fclose_or_die(nanny_cfg);
         return info;
-
-config_parse_line_return:
-        while (NULL != (info.data.process_name = config_parse_pname(argv[1])))
-                return info;
-
-        info.type = PW_END_FILE;
-        return info;
 }
 
+/*
+ *Parses 1st line of input configuration file and checks its validity:
+ *returns an unsigned on success; otherwise quit the program.
+ */
 static unsigned config_parse_threshold(FILE *const nanny_cfg)
 {
         /*
@@ -102,6 +112,7 @@ static unsigned config_parse_threshold(FILE *const nanny_cfg)
                  *"The first line is an integer number indicating how
                  * many seconds procnanny will run for."
                  */
+                errno = 0;
                 uintmax_t tmp = strtoumax(linebuf, &endptr, 10);
                 if (0 == tmp && linebuf == endptr) {
                         eprintf("strtoumax() : "
@@ -109,6 +120,13 @@ static unsigned config_parse_threshold(FILE *const nanny_cfg)
                         fclose_or_die(nanny_cfg);
                         exit(EXIT_FAILURE);
                 }
+                //checks overflow error
+                if (UINTMAX_MAX == tmp && ERANGE == errno) {
+                        perror("strtoumax()");
+                        fclose_or_die(nanny_cfg);
+                        exit(EXIT_FAILURE);
+                }
+
                 wait_period = tmp;
                 if (wait_period != tmp) {
                         eprintf("strtoumax() : "
@@ -130,11 +148,18 @@ static unsigned config_parse_threshold(FILE *const nanny_cfg)
  *This function receives a file name of the configuraiton file and returns
  *a pointer to each line of the file on each subsequent calls until either
  *EOF is reached or an error occurred.
+ *
+ *Return Value: NULL upon EOF; char * upon an actual line
+ *
  *Note: this function will _not_ close the FILE *nanny_cfg on error
  */
 static char *config_parse_pname(const char *const nanny_cfg_name)
 {
         static char   line_buf[PW_LINEBUF_SIZE];
+        /*
+         *this variable indicates the state of this function:
+         *whether we have already opened the sed_filter_file or not.
+         */
         static bool   in_file                 = false;
         static char   *tmp_fname              = "sed_filter_tmp";
         static fpos_t pos;
@@ -162,13 +187,19 @@ static char *config_parse_pname(const char *const nanny_cfg_name)
                         "while executing child process");
                 exit(EXIT_FAILURE);
         }
+        // optional, since PW_MEMSTACK_ENABLE_AUTO_CLEAN macro is present
         castack_pop(memstack);
 
 parse_continue:
         sed_filter_file = fopen_or_die(tmp_fname, "r");
+        //if the file has been opened before, recover its last position
         if (true == in_file) {
                 fsetpos_or_die(sed_filter_file, &pos);
         } else {
+                /*
+                 *flip the switch if it is the 1st time opened the
+                 *sed_filter_file
+                 */
                 in_file = true;
         }
                 
@@ -184,42 +215,9 @@ parse_continue:
 
         fgetpos_or_die(sed_filter_file, &pos);
         fclose_or_die(sed_filter_file);
+        //fgets() leaves the newline character untouched, so kill it
         line_buf[strlen(line_buf) - 1] = '\0';
         return line_buf;
-}
-
-FILE *fopen_or_die(const char *path, const char *mode)
-{
-        FILE *file = fopen(path, mode);
-        if (NULL == file) {
-                perror("fopen()");
-                exit(EXIT_FAILURE);
-        }
-        return file;
-}
-
-void fclose_or_die(FILE *stream)
-{
-        if (fclose(stream) == EOF) {
-                perror("fclose()");
-                exit(EXIT_FAILURE);
-        }
-}
-
-void fgetpos_or_die(FILE *stream, fpos_t *pos)
-{
-        if (0 != fgetpos(stream, pos)) {
-                perror("fgetpos()");
-                exit(EXIT_FAILURE);
-        }
-}
-
-void fsetpos_or_die(FILE *stream, const fpos_t *pos)
-{
-        if (0 != fsetpos(stream, pos)) {
-                perror("fsetpos()");
-                exit(EXIT_FAILURE);
-        }
 }
 
 static void clean_up(void)
