@@ -48,6 +48,11 @@ void procwatch(int argc, char **argv)
         }
 procwatch_loop_exit:
         
+        /*
+         *Once the main process has dispatched the work to all the
+         *worker processes, wait for them to finish so they would
+         *not become zombies.
+         */
         errno = 0;
         while (true) {
                 child_pid = wait(NULL);
@@ -95,7 +100,7 @@ static struct pw_config_info config_parse(int argc, char **argv)
                 info.type = PW_WAIT_THRESHOLD;
         }
 
-        if (argc != 2) {
+        if (2 != argc) {
                 eprintf("Usage: %s [FILE]\n", argv[0]);
                 exit(EXIT_FAILURE);
         }
