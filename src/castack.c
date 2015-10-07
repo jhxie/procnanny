@@ -21,14 +21,14 @@
  *A primitive application of OO ideology.
  */
 
-// these 2 below may be put into the header
+ /*these 2 below may be put into the header*/
 typedef struct node_ *link;
 
 struct castack {
     link   head;
     size_t numblk;
 };
-// these 2 above may be put into the header
+ /*these 2 above may be put into the header*/
 
 struct node_ {
     void *memblk;
@@ -52,7 +52,7 @@ struct castack *castack_init(void)
 void *castack_push(struct castack *current_castack, size_t nmemb, size_t size)
 {
         castack_pushnode_(current_castack);
-        // lastly allocate space for the memblk field of new node
+        /*lastly allocate space for the memblk field of new node*/
         current_castack->head->blksize = nmemb * size;
 
         return current_castack->head->memblk = calloc_or_die_(nmemb, size);
@@ -72,7 +72,7 @@ void *castack_realloc(struct castack *current_castack, void *mem, size_t size)
                 return current_castack->head->memblk = calloc_or_die_(1, size);
         }
 
-        // try find the memory block on the castack
+        /*try find the memory block on the castack*/
         link tmp_ptr = current_castack->head;
 
         while (tmp_ptr != NULL) {
@@ -81,7 +81,7 @@ void *castack_realloc(struct castack *current_castack, void *mem, size_t size)
                 tmp_ptr = tmp_ptr->next;
         }
 
-        // if the address passed does not happen to be on the castack
+        /*if the address passed does not happen to be on the castack*/
         if (tmp_ptr == NULL) {
                 return NULL;
         } else if (size == 0) {
@@ -113,10 +113,10 @@ void castack_pop(struct castack *current_castack)
         link tmp_ptr = NULL;
 
         if (current_castack->head != NULL) {
-                // free the memory block pointed by individual node
+                /*free the memory block pointed by individual node*/
                 free(current_castack->head->memblk);
                 tmp_ptr = current_castack->head->next;
-                // then free the node itself
+                /*then free the node itself*/
                 free(current_castack->head);
                 current_castack->head = tmp_ptr;
                 current_castack->numblk--;
@@ -137,12 +137,12 @@ void castack_free(struct castack *current_castack)
 {
         link tmp_ptr = NULL;
 
-        // similar to pop but with a loop
+        /*similar to pop but with a loop*/
         while (current_castack->head != NULL) {
-                // free the memory block pointed by individual node
+                /*free the memory block pointed by individual node*/
                 free(current_castack->head->memblk);
                 tmp_ptr = current_castack->head->next;
-                // then free the node itself
+                /*then free the node itself*/
                 free(current_castack->head);
                 current_castack->head = tmp_ptr;
                 current_castack->numblk--;
@@ -153,12 +153,12 @@ void castack_destroy(struct castack **current_castack)
 {
         castack_free(*current_castack);
 
-        // free the castack itself
+        /*free the castack itself*/
         free(*current_castack);
         *current_castack = NULL;
 }
 
-//All the functions that have internal linkage are listed below.
+/*All the functions that have internal linkage are listed below.*/
 static void *calloc_or_die_(size_t nmemb, size_t size)
 {
         void *rtn_ptr = calloc(nmemb, size);
@@ -186,23 +186,25 @@ static void *realloc_or_die_(void *const ptr, size_t size)
 
 static void castack_pushnode_(struct castack *current_castack)
 {
-        // first allocate space for node
+        /*first allocate space for node*/
         link memblk_ptr = calloc_or_die_(1, sizeof(struct node_));
 
-        // then link the node
+        /*then link the node*/
         if (current_castack->head != NULL) {
-                // let the next field of new node point to
-                // previously allocated node
+                 /*
+                  *let the next field of new node point to
+                  *previously allocated node
+                  */
                 memblk_ptr->next = current_castack->head;
         } else {
                 memblk_ptr->next = NULL;
         }
 
-        // let the head node pointer point to the new node
+        /*let the head node pointer point to the new node*/
         current_castack->head = memblk_ptr;
         current_castack->head->memblk = NULL;
         current_castack->head->blksize = 0;
         current_castack->numblk++;
 }
 
-//All the functions that have internal linkage are listed above.
+/*All the functions that have internal linkage are listed above.*/

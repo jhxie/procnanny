@@ -72,7 +72,7 @@ static struct pw_config_info config_parse(int argc, char **argv)
                        (info.data.process_name = config_parse_pname(argv[1])))
                         return info;
 
-                //if NULL is returned for the previous loop, we have a EOF
+                /*if NULL is returned for the previous loop, we have a EOF*/
                 info.type = PW_END_FILE;
                 return info;
         } else {
@@ -105,8 +105,10 @@ static unsigned config_parse_threshold(FILE *const nanny_cfg)
          *allocated by getline()
          */
         char linebuf[PW_LINEBUF_SIZE] = {};
-        // dummy variable, since the case is ignored
-        // where the first line is not a valid number
+         /*
+          *dummy variable, since the case is ignored
+          *where the first line is not a valid number
+          */
         char *endptr = NULL;
         unsigned wait_period = 0;
 
@@ -123,7 +125,7 @@ static unsigned config_parse_threshold(FILE *const nanny_cfg)
                         fclose_or_die(nanny_cfg);
                         exit(EXIT_FAILURE);
                 }
-                //checks overflow error
+                /*checks overflow error*/
                 if (UINTMAX_MAX == tmp && ERANGE == errno) {
                         perror("strtoumax()");
                         fclose_or_die(nanny_cfg);
@@ -172,17 +174,18 @@ static char *config_parse_pname(const char *const nanny_cfg_name)
                 goto parse_continue;
         }
 
-        enum { SED_FILTER, NANNY_CFG_NAME, UNIQ_FILTER, TMP_FNAME};
         const char *cmd_options[]     =
         {"sed -n \'2,$p;$q\' ", nanny_cfg_name, " | uniq > ", tmp_fname};
-        size_t cat_str_size =
-                strlen(cmd_options[SED_FILTER])     +
-                strlen(cmd_options[NANNY_CFG_NAME]) +
-                strlen(cmd_options[UNIQ_FILTER])    +
-                strlen(cmd_options[TMP_FNAME])      + 1;
+        /*initialize the size to add an extra terminating character*/
+        size_t cat_str_size = 1;
+
+        for (size_t i = 0; i < sizeof cmd_options; ++i)
+                cat_str_size += strlen(cmd_options[i]);
+
         char *cmd_buffer  = castack_push(memstack, 1, cat_str_size);
 
-        for (size_t i = SED_FILTER; i <= TMP_FNAME; ++i)
+        /*put all the strings in the buffer*/
+        for (size_t i = 0; i < sizeof cmd_options; ++i)
                 strcat(cmd_buffer, cmd_options[i]);
 
         if (-1 == system(cmd_buffer)) {
@@ -190,13 +193,13 @@ static char *config_parse_pname(const char *const nanny_cfg_name)
                         "while executing child process");
                 exit(EXIT_FAILURE);
         }
-        // optional, since PW_MEMSTACK_ENABLE_AUTO_CLEAN macro is present
+         /*optional, since PW_MEMSTACK_ENABLE_AUTO_CLEAN macro is present*/
         castack_pop(memstack);
         cmd_buffer = NULL;
 
 parse_continue:
         sed_filter_file = fopen_or_die(tmp_fname, "r");
-        //if the file has been opened before, recover its last position
+        /*if the file has been opened before, recover its last position*/
         if (true == in_file) {
                 fsetpos_or_die(sed_filter_file, &pos);
         } else {
@@ -219,7 +222,7 @@ parse_continue:
 
         fgetpos_or_die(sed_filter_file, &pos);
         fclose_or_die(sed_filter_file);
-        //fgets() leaves the newline character untouched, so kill it
+        /*fgets() leaves the newline character untouched, so kill it*/
         line_buf[strlen(line_buf) - 1] = '\0';
         return line_buf;
 }
@@ -235,11 +238,10 @@ static void work_dispatch(unsigned wait_threshold, const char *process_name)
         char *cmd_buffer = castack_push(memstack, 1, cat_str_size);
         FILE *pgrep_pipe = NULL;
 
-        strcat(cmd_buffer, pgrep_filter);
-        strcat(cmd_buffer, process_name);
+        snprintf(cmd_buffer, cat_str_size, "%s%s", pgrep_filter, process_name);
 
         pgrep_pipe = popen_or_die(cmd_buffer, "r");
-        // again, this is optional
+        /*again, this is optional*/
         castack_pop(memstack);
         cmd_buffer = NULL;
 
@@ -262,7 +264,7 @@ static void work_dispatch(unsigned wait_threshold, const char *process_name)
                                 break;
                 }
         }
-
+        pclose_or_die(pgrep_pipe);
 }
 
 static void clean_up(void)
