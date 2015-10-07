@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include "castack.h"
@@ -27,6 +28,7 @@ void procwatch(int argc, char **argv)
         PW_MEMSTACK_ENABLE_AUTO_CLEAN();
         struct pw_config_info info;
         unsigned wait_threshold = 0;
+        pid_t child_pid;
 
         while (true) {
                 info = config_parse(argc, argv);
@@ -45,7 +47,20 @@ void procwatch(int argc, char **argv)
                 }
         }
 procwatch_loop_exit:
-        ;
+        
+        errno = 0;
+        while (true) {
+                child_pid = wait(NULL);
+
+                if (-1 == child_pid) {
+                        if (ECHILD == errno) {
+                                return;
+                        } else {
+                                perror("wait()");
+                                exit(EXIT_FAILURE);
+                        }
+                }
+        }
 }
 
 
@@ -245,34 +260,40 @@ static void work_dispatch(unsigned wait_threshold, const char *process_name)
         castack_pop(memstack);
         cmd_buffer = NULL;
 
+        bool process_not_found = true;
         char linebuf[PW_LINEBUF_SIZE] = {};
         char *endptr = NULL;
         uintmax_t watched_process_id = 0;
 
         while (NULL != fgets(linebuf, sizeof linebuf, pgrep_pipe)) {
+                process_not_found = false;
                 watched_process_id = strtoumax(linebuf, &endptr, 10);
 
                 switch (fork_or_die()) {
                 case 0:
-                        process_watch(wait_threshold,(pid_t)watched_process_id);
+                        process_monitor(wait_threshold,
+                                        (pid_t)watched_process_id);
                         /*NEVER REACHED AGAIN*/
                         break;
                 default:
                         break;
                 }
         }
+        if (true == process_not_found) {
+                eprintf("Process not found\n");
+        }
         pclose_or_die(pgrep_pipe);
 }
 
-static void process_watch(unsigned wait_threshold, pid_t watched_process_id)
+static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
 {
         sleep(wait_threshold);
         /*
-         *Even though the checking is performed before the
+         *Even though the checking is performed on errno after the
          *process is killed, we still have a potential problem
          *of killing some other processes end up with the
-         *pid_t same as the one before;
-         *The recycling nature of pid_t is IGNORED.
+         *pid same as the one before;
+         *The recycling nature of pid is IGNORED.
          */
         errno = 0;
         /*
@@ -289,7 +310,7 @@ static void process_watch(unsigned wait_threshold, pid_t watched_process_id)
                         perror("kill()");
                         break;
                 case ESRCH:
-                        /*The process no longer exists*/
+                        /*The watched process no longer exists*/
                         perror("kill()");
                         break;
                 }
