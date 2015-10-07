@@ -174,18 +174,18 @@ static char *config_parse_pname(const char *const nanny_cfg_name)
                 goto parse_continue;
         }
 
-        const char *cmd_options[]     =
+        const char *cmd_options[4]     =
         {"sed -n \'2,$p;$q\' ", nanny_cfg_name, " | uniq > ", tmp_fname};
         /*initialize the size to add an extra terminating character*/
         size_t cat_str_size = 1;
 
-        for (size_t i = 0; i < sizeof cmd_options; ++i)
+        for (size_t i = 0; i < 4; ++i)
                 cat_str_size += strlen(cmd_options[i]);
 
         char *cmd_buffer  = castack_push(memstack, 1, cat_str_size);
 
         /*put all the strings in the buffer*/
-        for (size_t i = 0; i < sizeof cmd_options; ++i)
+        for (size_t i = 0; i < 4; ++i)
                 strcat(cmd_buffer, cmd_options[i]);
 
         if (-1 == system(cmd_buffer)) {
@@ -247,24 +247,54 @@ static void work_dispatch(unsigned wait_threshold, const char *process_name)
 
         char linebuf[PW_LINEBUF_SIZE] = {};
         char *endptr = NULL;
-        uintmax_t tmp = 0;
-        pid_t watched_process_id = 0;
+        uintmax_t watched_process_id = 0;
 
         while (NULL != fgets(linebuf, sizeof linebuf, pgrep_pipe)) {
-                tmp = strtoumax(linebuf, &endptr, 10);
-                watched_process_id = (pid_t)tmp;
+                watched_process_id = strtoumax(linebuf, &endptr, 10);
 
                 switch (fork_or_die()) {
                 case 0:
-                        sleep(wait_threshold);
-                        kill(watched_process_id, SIGKILL);
-                        exit(EXIT_SUCCESS);
-                                break;
+                        process_watch(wait_threshold,(pid_t)watched_process_id);
+                        /*NEVER REACHED AGAIN*/
+                        break;
                 default:
-                                break;
+                        break;
                 }
         }
         pclose_or_die(pgrep_pipe);
+}
+
+static void process_watch(unsigned wait_threshold, pid_t watched_process_id)
+{
+        sleep(wait_threshold);
+        /*
+         *Even though the checking is performed before the
+         *process is killed, we still have a potential problem
+         *of killing some other processes end up with the
+         *pid_t same as the one before;
+         *The recycling nature of pid_t is IGNORED.
+         */
+        errno = 0;
+        /*
+         *This is a guaranteed kill if the listed 2 cases
+         *do not apply, so SIGKILL is used rather than SIGTERM
+         */
+        if (0 != kill(watched_process_id, SIGKILL)) {
+                switch (errno) {
+                case EPERM:
+                        /*
+                         *This process does not have the permission
+                         *to kill the watched process
+                         */
+                        perror("kill()");
+                        break;
+                case ESRCH:
+                        /*The process no longer exists*/
+                        perror("kill()");
+                        break;
+                }
+        }
+        exit(EXIT_SUCCESS);
 }
 
 static void clean_up(void)
