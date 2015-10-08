@@ -28,6 +28,9 @@
 
 enum { PW_LINEBUF_SIZE = 1024 };
 static struct castack *memstack = NULL;
+static struct pw_watched_pid_pair *pid_pair_array = NULL;
+size_t pid_pair_array_size = 0;
+size_t pid_pair_array_index = 0;
 
 void procwatch(int argc, char **argv)
 {
@@ -35,6 +38,15 @@ void procwatch(int argc, char **argv)
         setbuf(stdout, NULL);
         memstack = castack_init();
         PW_MEMSTACK_ENABLE_AUTO_CLEAN();
+
+        /*
+         *This array is used to store the watched pid pairs
+         */
+        pid_pair_array_size = 256;
+        pid_pair_array =
+                castack_push(memstack,
+                             pid_pair_array_size,
+                             sizeof(struct pw_watched_pid_pair));
 
         procclean();
         FILE *pwlog = pwlog_setup();
@@ -340,6 +352,16 @@ static void work_dispatch(unsigned wait_threshold, const char *process_name)
 
 static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
 {
+        if (pid_pair_array_index == pid_pair_array_size) {
+                pid_pair_array_size *= 2;
+                pid_pair_array = castack_realloc(memstack,
+                                                 pid_pair_array,
+                                                 pid_pair_array_size);
+        }
+
+        pid_pair_array[pid_pair_array_index].child_pid = getpid();
+        pid_pair_array[pid_pair_array_index].watched_pid = watched_process_id;
+
         sleep(wait_threshold);
         /*
          *Even though the checking is performed on errno after the
