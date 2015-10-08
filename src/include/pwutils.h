@@ -9,7 +9,7 @@
  *to be called upon exit()
  */
 #define PW_MEMSTACK_ENABLE_AUTO_CLEAN() do { \
-        if (0 != atexit(clean_up)) { \
+        if (0 != atexit(memstack_clean)) { \
                 eprintf("atexit(): cannot set exit function\n"); \
                 castack_destroy(&memstack); \
                 exit(EXIT_FAILURE); \
@@ -22,6 +22,7 @@ static char *config_parse_pname(const char *const nanny_cfg_name);
 static void work_dispatch(unsigned wait_threshold, const char *process_name);
 static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
                 __attribute__((noreturn));
-static inline void clean_up(void);
+static void log_setup(void);
+static inline void memstack_clean(void);
 
 #endif

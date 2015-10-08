@@ -1,10 +1,16 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <errno.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -19,13 +25,19 @@
 
 #include "memwatch.h"
 
+
 enum { PW_LINEBUF_SIZE = 1024 };
 static struct castack *memstack = NULL;
+static int pwlogfd = 0;
 
 void procwatch(int argc, char **argv)
 {
+        /*Make stdout unbuffered.*/
+        setbuf(stdout, NULL);
         memstack = castack_init();
+        log_setup();
         PW_MEMSTACK_ENABLE_AUTO_CLEAN();
+
         struct pw_config_info info;
         unsigned wait_threshold = 0;
         pid_t child_pid;
@@ -66,6 +78,7 @@ procwatch_loop_exit:
                         }
                 }
         }
+        close_or_die(pwlogfd);
 }
 
 
@@ -331,7 +344,23 @@ static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
         exit(EXIT_SUCCESS);
 }
 
-static void clean_up(void)
+static void log_setup(void)
+{
+        /*
+         *TODO
+         *does the environment variable only specifies the path?
+         */
+        const char *const pwlog_location =secure_getenv_or_die("PROCNANNYLOGS");
+        const char *const pwlog_name = "procnanny.log";
+        size_t pwlog_path_len = strlen(pwlog_location) + strlen(pwlog_name) + 1;
+        char *pwlog_path = castack_push(memstack, 1, pwlog_path_len);
+
+        snprintf(pwlog_path, pwlog_path_len,
+                 "%s%s", pwlog_location, pwlog_name);
+        pwlogfd = open(pwlog_path, O_WRONLY | O_APPEND);
+}
+
+static void memstack_clean(void)
 {
         castack_destroy(&memstack);
 }

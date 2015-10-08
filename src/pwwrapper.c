@@ -1,5 +1,12 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "pwwrapper.h"
@@ -70,5 +77,33 @@ pid_t fork_or_die(void)
                 exit(EXIT_FAILURE);
         } else {
                 return process_id;
+        }
+}
+
+const char *secure_getenv_or_die(const char *name)
+{
+        const char *val;
+        if (NULL == (val = secure_getenv(name))) {
+                fprintf(stderr,
+                        "The environment variable %s does not exist", name);
+        }
+        return val;
+}
+
+int open_or_die(const char *pathname, int flags)
+{
+        int fd;
+        if (-1 == (fd = open(pathname, flags))) {
+                perror("open()");
+                exit(EXIT_FAILURE);
+        }
+        return fd;
+}
+
+void close_or_die(int fd)
+{
+        if (-1 == close(fd)) {
+                perror("close()");
+                exit(EXIT_FAILURE);
         }
 }
