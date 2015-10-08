@@ -233,6 +233,7 @@ parse_continue:
         if (NULL == fgets(line_buf, sizeof line_buf, sed_filter_file)) {
                 if (feof(sed_filter_file)) {
                         fclose_or_die(sed_filter_file);
+                        remove(tmp_fname);
                         return NULL;
                 } else {
                         perror("fgets()");
@@ -253,14 +254,21 @@ static void work_dispatch(unsigned wait_threshold, const char *process_name)
          *ASSUMPTION: the length of a line is no more than 1023 characters
          *(same as config_parse_threshold())
          */
-        const char *const pgrep_filter = "pgrep ";
-        size_t cat_str_size = strlen(pgrep_filter) + strlen(process_name) + 1;
+        const char *const pidof_filter = "pidof -x ";
+        const char *const tr_filter = " | tr \' \' \'\n\'";
+        size_t cat_str_size =
+                strlen(pidof_filter) +
+                strlen(process_name) +
+                strlen(tr_filter)    + 1;
         char *cmd_buffer = castack_push(memstack, 1, cat_str_size);
-        FILE *pgrep_pipe = NULL;
+        FILE *pidof_pipe = NULL;
 
-        snprintf(cmd_buffer, cat_str_size, "%s%s", pgrep_filter, process_name);
+        snprintf(cmd_buffer, cat_str_size, "%s%s%s",
+                 pidof_filter,
+                 process_name,
+                 tr_filter);
 
-        pgrep_pipe = popen_or_die(cmd_buffer, "r");
+        pidof_pipe = popen_or_die(cmd_buffer, "r");
         /*again, this is optional*/
         castack_pop(memstack);
         cmd_buffer = NULL;
@@ -270,7 +278,7 @@ static void work_dispatch(unsigned wait_threshold, const char *process_name)
         char *endptr = NULL;
         uintmax_t watched_process_id = 0;
 
-        while (NULL != fgets(linebuf, sizeof linebuf, pgrep_pipe)) {
+        while (NULL != fgets(linebuf, sizeof linebuf, pidof_pipe)) {
                 process_not_found = false;
                 watched_process_id = strtoumax(linebuf, &endptr, 10);
 
@@ -287,7 +295,7 @@ static void work_dispatch(unsigned wait_threshold, const char *process_name)
         if (true == process_not_found) {
                 eprintf("Process not found\n");
         }
-        pclose_or_die(pgrep_pipe);
+        pclose_or_die(pidof_pipe);
 }
 
 static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
