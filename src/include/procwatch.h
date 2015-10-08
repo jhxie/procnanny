@@ -19,6 +19,8 @@ struct pw_watched_pid_pair {
     pid_t watched_pid;
 };
 
+enum pw_log_type { INFO_INIT, INFO_NOEXIST, INFO_REPORT, ACTION_KILL,};
+
 void procwatch(int argc, char **argv);
 
 #endif

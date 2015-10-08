@@ -13,6 +13,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "castack.h"
@@ -403,6 +404,28 @@ static FILE *pwlog_setup(void)
         const char *const pwlog_path =secure_getenv_or_die("PROCNANNYLOGS");
 
         return fopen_or_die(pwlog_path, "w");
+}
+
+static void pwlog_write(FILE *pwlog,
+                        enum pw_log_type logtype,
+                        pid_t watched_pid,
+                        const char *const process_name)
+{
+        /*
+         *ASSUMPTION: the length of a line is no more than 1023 characters
+         */
+        char timebuf[PW_LINEBUF_SIZE] = {};
+        time_t epoch_time = time(NULL);
+        struct tm *cal = localtime(&epoch_time);
+        strftime(timebuf, PW_LINEBUF_SIZE, "%a %b %d %T %Z %Y", cal);
+
+        switch (logtype) {
+        case INFO_INIT:
+        case INFO_NOEXIST:
+        case INFO_REPORT:
+        case ACTION_KILL:
+                return;
+        }
 }
 
 static void memstack_clean(void)
