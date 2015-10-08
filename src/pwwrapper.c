@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "procwatch.h"
 #include "pwwrapper.h"
 
 FILE *fopen_or_die(const char *path, const char *mode)
@@ -84,8 +85,8 @@ const char *secure_getenv_or_die(const char *name)
 {
         const char *val;
         if (NULL == (val = secure_getenv(name))) {
-                fprintf(stderr,
-                        "The environment variable %s does not exist", name);
+                eprintf("The environment variable %s does not exist\n", name);
+                exit(EXIT_FAILURE);
         }
         return val;
 }

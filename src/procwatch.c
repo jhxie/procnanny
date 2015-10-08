@@ -7,8 +7,8 @@
 #include <inttypes.h>
 #include <signal.h>
 #include <stdbool.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -28,16 +28,16 @@
 
 enum { PW_LINEBUF_SIZE = 1024 };
 static struct castack *memstack = NULL;
-static int pwlogfd = 0;
 
 void procwatch(int argc, char **argv)
 {
         /*Make stdout unbuffered.*/
         setbuf(stdout, NULL);
         memstack = castack_init();
-        log_setup();
         PW_MEMSTACK_ENABLE_AUTO_CLEAN();
 
+        procclean();
+        FILE *pwlog = pwlog_setup();
         struct pw_config_info info;
         unsigned wait_threshold = 0;
         pid_t child_pid;
@@ -78,9 +78,36 @@ procwatch_loop_exit:
                         }
                 }
         }
-        close_or_die(pwlogfd);
+        fclose_or_die(pwlog);
 }
 
+
+static void procclean(void)
+{
+        /*
+         *ASSUMPTION: the length of a line is no more than 1023 characters
+         */
+        FILE *clean_pipe              =
+                popen_or_die("pidof -x procnanny | tr \' \' \'\n\'", "r");
+        char linebuf[PW_LINEBUF_SIZE] = {};
+        char *endptr                  = NULL;
+        const pid_t pw_id             = getpid();
+        uintmax_t zombie_id           = 0;
+        errno                         = 0;
+
+        while (NULL != fgets(linebuf, sizeof linebuf, clean_pipe)) {
+                zombie_id = strtoumax(linebuf, &endptr, 10);
+
+                if (pw_id == (pid_t)zombie_id)
+                        continue;
+
+                if (0 != kill((pid_t)zombie_id, SIGKILL)) {
+                        perror("kill()");
+                        exit(EXIT_FAILURE);
+                }
+        }
+        pclose_or_die(clean_pipe);
+}
 
 /*
  *According to the assignment specification,
@@ -344,7 +371,7 @@ static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
         exit(EXIT_SUCCESS);
 }
 
-static void log_setup(void)
+static FILE *pwlog_setup(void)
 {
         /*
          *TODO
@@ -357,7 +384,7 @@ static void log_setup(void)
 
         snprintf(pwlog_path, pwlog_path_len,
                  "%s%s", pwlog_location, pwlog_name);
-        pwlogfd = open(pwlog_path, O_WRONLY | O_APPEND);
+        return fopen_or_die(pwlog_path, "w");
 }
 
 static void memstack_clean(void)
