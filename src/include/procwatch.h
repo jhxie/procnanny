@@ -2,6 +2,7 @@
 #define PROCWATCH_H_
 
 #include <stdio.h>
+#include <sys/types.h>
 
 #define eprintf(...) fprintf(stderr, __VA_ARGS__)
 
@@ -11,6 +12,11 @@ struct pw_config_info {
         unsigned   wait_threshold;
         const char *process_name;
     } data;
+};
+
+struct pw_watched_pid_pair {
+    pid_t child_pid;
+    pid_t watched_pid;
 };
 
 void procwatch(int argc, char **argv);

@@ -358,13 +358,14 @@ static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
                 case EPERM:
                         /*
                          *This process does not have the permission
-                         *to kill the watched process
+                         *to kill the watched process.
                          */
-                        perror("kill()");
-                        break;
                 case ESRCH:
-                        /*The watched process no longer exists*/
-                        perror("kill()");
+                        /*
+                         *If the watched process no longer exist,
+                         *the monitor action is considered "failed".
+                         */
+                        exit(EXIT_FAILURE);
                         break;
                 }
         }
@@ -377,13 +378,8 @@ static FILE *pwlog_setup(void)
          *TODO
          *does the environment variable only specifies the path?
          */
-        const char *const pwlog_location =secure_getenv_or_die("PROCNANNYLOGS");
-        const char *const pwlog_name = "procnanny.log";
-        size_t pwlog_path_len = strlen(pwlog_location) + strlen(pwlog_name) + 1;
-        char *pwlog_path = castack_push(memstack, 1, pwlog_path_len);
+        const char *const pwlog_path =secure_getenv_or_die("PROCNANNYLOGS");
 
-        snprintf(pwlog_path, pwlog_path_len,
-                 "%s%s", pwlog_location, pwlog_name);
         return fopen_or_die(pwlog_path, "w");
 }
 
