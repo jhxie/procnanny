@@ -14,9 +14,10 @@ struct pw_config_info {
     } data;
 };
 
-struct pw_watched_pid_pair {
+struct pw_watched_pid_info {
     pid_t child_pid;
     pid_t watched_pid;
+    char *process_name;
 };
 
 

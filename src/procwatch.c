@@ -29,7 +29,7 @@
 
 enum { PW_LINEBUF_SIZE = 1024 };
 static struct castack *memstack = NULL;
-static struct pw_watched_pid_pair *pid_pair_array = NULL;
+static struct pw_watched_pid_info *pid_pair_array = NULL;
 size_t pid_pair_array_size = 0;
 size_t pid_pair_array_index = 0;
 
@@ -47,8 +47,7 @@ void procwatch(int argc, char **argv)
         pid_pair_array =
                 castack_push(memstack,
                              pid_pair_array_size,
-                             sizeof(struct pw_watched_pid_pair));
-
+                             sizeof(struct pw_watched_pid_info));
         procclean();
         FILE *pwlog = pwlog_setup();
         struct pw_config_info confinfo = {};
@@ -88,7 +87,9 @@ procwatch_loop_exit:
                         loginfo.num_term++;
                         loginfo.log_type = ACTION_KILL;
                         loginfo.watched_pid = pid_pair_array[i].watched_pid;
+                        loginfo.process_name = pid_pair_array[i].process_name;
                         pwlog_write(pwlog, &loginfo);
+                        free(pid_pair_array[i].process_name);
                 }
         }
 
@@ -351,7 +352,9 @@ static void work_dispatch(FILE *pwlog, struct pw_log_info *const loginfo)
                         loginfo->log_type = INFO_INIT;
                         loginfo->watched_pid = (pid_t)watched_pid;
                         pwlog_write(pwlog, loginfo);
-                        pid_array_update(child_pid, watched_pid);
+                        pid_array_update(child_pid,
+                                         watched_pid,
+                                         loginfo->process_name);
                         break;
                 }
         }
@@ -451,7 +454,7 @@ static void pwlog_write(FILE *pwlog, struct pw_log_info *loginfo)
         fflush(pwlog);
 }
 
-static void pid_array_update(pid_t child_pid, pid_t watched_pid)
+static void pid_array_update(pid_t child_pid, pid_t watched_pid, const char *process_name)
 {
         if (pid_pair_array_index == pid_pair_array_size) {
         pid_pair_array_size *= 2;
@@ -461,6 +464,9 @@ static void pid_array_update(pid_t child_pid, pid_t watched_pid)
         }
         pid_pair_array[pid_pair_array_index].child_pid = child_pid;
         pid_pair_array[pid_pair_array_index].watched_pid = watched_pid;
+        pid_pair_array[pid_pair_array_index].process_name = 
+                calloc(1, strlen(process_name) + 1);
+        strcpy(pid_pair_array[pid_pair_array_index].process_name, process_name);
         pid_pair_array_index++;
 }
 

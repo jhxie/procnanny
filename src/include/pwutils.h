@@ -25,7 +25,9 @@ static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
                 __attribute__((noreturn));
 static FILE *pwlog_setup(void) __attribute__((warn_unused_result));
 static void pwlog_write(FILE *pwlog, struct pw_log_info *loginfo);
-static void pid_array_update(pid_t child_pid, pid_t watched_pid);
+static void pid_array_update(pid_t child_pid,
+                             pid_t watched_pid,
+                             const char *process_name);
 static inline void memstack_clean(void);
 
 #endif
