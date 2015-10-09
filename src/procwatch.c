@@ -89,8 +89,11 @@ procwatch_loop_exit:
                         loginfo.watched_pid = pid_pair_array[i].watched_pid;
                         loginfo.process_name = pid_pair_array[i].process_name;
                         pwlog_write(pwlog, &loginfo);
-                        free(pid_pair_array[i].process_name);
                 }
+        }
+
+        for (size_t i = 0; i < pid_pair_array_index; ++i) {
+                free(pid_pair_array[i].process_name);
         }
 
         loginfo.log_type = INFO_REPORT;
@@ -343,6 +346,8 @@ static void work_dispatch(FILE *pwlog, struct pw_log_info *const loginfo)
                 child_pid = fork_or_die();
                 switch (child_pid) {
                 case 0:
+                        pclose(pidof_pipe);
+                        fclose_or_die(pwlog);
                         process_monitor(loginfo->wait_threshold,
                                         (pid_t)watched_pid);
                         /*NEVER REACHED AGAIN*/
