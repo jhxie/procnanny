@@ -58,12 +58,10 @@ void procwatch(int argc, char **argv)
                 confinfo = config_parse(argc, argv);
                 switch (confinfo.type) {
                 case PW_PROCESS_NAME:
-                        printf("%s\n", confinfo.data.process_name);
                         loginfo.process_name = confinfo.data.process_name;
                         work_dispatch(pwlog, &loginfo);
                         break;
                 case PW_WAIT_THRESHOLD:
-                        printf("%d\n", confinfo.data.wait_threshold);
                         loginfo.wait_threshold = confinfo.data.wait_threshold;
                         break;
                 case PW_END_FILE:
