@@ -11,6 +11,7 @@
 
 #include "procwatch.h"
 #include "pwwrapper.h"
+#include "memwatch.h"
 
 FILE *fopen_or_die(const char *path, const char *mode)
 {
