@@ -51,20 +51,21 @@ void procwatch(int argc, char **argv)
 
         procclean();
         FILE *pwlog = pwlog_setup();
-        struct pw_config_info info;
-        unsigned wait_threshold = 0;
-        pid_t child_pid;
+        struct pw_config_info confinfo = {};
+        struct pw_log_info loginfo = {};
+        int child_return_status;
 
         while (true) {
-                info = config_parse(argc, argv);
-                switch (info.type) {
+                confinfo = config_parse(argc, argv);
+                switch (confinfo.type) {
                 case PW_PROCESS_NAME:
-                        printf("%s\n", info.data.process_name);
-                        work_dispatch(wait_threshold, info.data.process_name);
+                        printf("%s\n", confinfo.data.process_name);
+                        loginfo.process_name = confinfo.data.process_name;
+                        work_dispatch(pwlog, &loginfo);
                         break;
                 case PW_WAIT_THRESHOLD:
-                        printf("%d\n", info.data.wait_threshold);
-                        wait_threshold = info.data.wait_threshold;
+                        printf("%d\n", confinfo.data.wait_threshold);
+                        loginfo.wait_threshold = confinfo.data.wait_threshold;
                         break;
                 case PW_END_FILE:
                         goto procwatch_loop_exit;
@@ -79,18 +80,20 @@ procwatch_loop_exit:
          *not become zombies.
          */
         errno = 0;
-        while (true) {
-                child_pid = wait(NULL);
-
-                if (-1 == child_pid) {
-                        if (ECHILD == errno) {
-                                return;
-                        } else {
-                                perror("wait()");
-                                exit(EXIT_FAILURE);
-                        }
+        loginfo.num_term = 0;
+        for (size_t i = 0; i < pid_pair_array_index; ++i) {
+                waitpid(pid_pair_array[i].child_pid, &child_return_status, 0);
+                if (WIFEXITED(child_return_status) &&
+                    EXIT_SUCCESS == WEXITSTATUS(child_return_status)) {
+                        loginfo.num_term++;
+                        loginfo.log_type = ACTION_KILL;
+                        loginfo.watched_pid = pid_pair_array[i].watched_pid;
+                        pwlog_write(pwlog, &loginfo);
                 }
         }
+
+        loginfo.log_type = INFO_REPORT;
+        pwlog_write(pwlog, &loginfo);
         fclose_or_die(pwlog);
 }
 
@@ -301,7 +304,7 @@ parse_continue:
         return line_buf;
 }
 
-static void work_dispatch(unsigned wait_threshold, const char *process_name)
+static void work_dispatch(FILE *pwlog, struct pw_log_info *const loginfo)
 {
         /*
          *ASSUMPTION: the length of a line is no more than 1023 characters
@@ -311,14 +314,14 @@ static void work_dispatch(unsigned wait_threshold, const char *process_name)
         const char *const tr_filter = " | tr \' \' \'\n\'";
         size_t cat_str_size =
                 strlen(pidof_filter) +
-                strlen(process_name) +
+                strlen(loginfo->process_name) +
                 strlen(tr_filter)    + 1;
         char *cmd_buffer = castack_push(memstack, 1, cat_str_size);
         FILE *pidof_pipe = NULL;
 
         snprintf(cmd_buffer, cat_str_size, "%s%s%s",
                  pidof_filter,
-                 process_name,
+                 loginfo->process_name,
                  tr_filter);
 
         pidof_pipe = popen_or_die(cmd_buffer, "r");
@@ -329,40 +332,39 @@ static void work_dispatch(unsigned wait_threshold, const char *process_name)
         bool process_not_found = true;
         char linebuf[PW_LINEBUF_SIZE] = {};
         char *endptr = NULL;
-        uintmax_t watched_process_id = 0;
+        uintmax_t watched_pid = 0;
+        pid_t child_pid;
 
         while (NULL != fgets(linebuf, sizeof linebuf, pidof_pipe)) {
                 process_not_found = false;
-                watched_process_id = strtoumax(linebuf, &endptr, 10);
+                watched_pid = strtoumax(linebuf, &endptr, 10);
 
-                switch (fork_or_die()) {
+                child_pid = fork_or_die();
+                switch (child_pid) {
                 case 0:
-                        process_monitor(wait_threshold,
-                                        (pid_t)watched_process_id);
+                        process_monitor(loginfo->wait_threshold,
+                                        (pid_t)watched_pid);
                         /*NEVER REACHED AGAIN*/
                         break;
                 default:
+                        /*Parent write INFO_INIT log*/
+                        loginfo->log_type = INFO_INIT;
+                        loginfo->watched_pid = (pid_t)watched_pid;
+                        pwlog_write(pwlog, loginfo);
+                        pid_array_update(child_pid, watched_pid);
                         break;
                 }
         }
         if (true == process_not_found) {
-                eprintf("Process not found\n");
+                /*Parent write INFO_NOEXIST log*/
+                loginfo->log_type = INFO_NOEXIST;
+                pwlog_write(pwlog, loginfo);
         }
         pclose_or_die(pidof_pipe);
 }
 
 static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
 {
-        if (pid_pair_array_index == pid_pair_array_size) {
-                pid_pair_array_size *= 2;
-                pid_pair_array = castack_realloc(memstack,
-                                                 pid_pair_array,
-                                                 pid_pair_array_size);
-        }
-
-        pid_pair_array[pid_pair_array_index].child_pid = getpid();
-        pid_pair_array[pid_pair_array_index].watched_pid = watched_process_id;
-
         sleep(wait_threshold);
         /*
          *Even though the checking is performed on errno after the
@@ -416,7 +418,7 @@ static void pwlog_write(FILE *pwlog, struct pw_log_info *loginfo)
         char *timestr = castack_push(memstack, 1, strlen(timebuf) + 3);
         snprintf(timestr, strlen(timebuf) + 3, "[%s]", timebuf);
         /*Print the time field only*/
-        fputs_or_die(timebuf, pwlog);
+        fputs_or_die(timestr, pwlog);
 
         /*
          *For the pid_t data type, POSIX standard                    
@@ -446,21 +448,23 @@ static void pwlog_write(FILE *pwlog, struct pw_log_info *loginfo)
                         loginfo->wait_threshold);
                 break;
         }
+        fflush(pwlog);
+}
+
+static void pid_array_update(pid_t child_pid, pid_t watched_pid)
+{
+        if (pid_pair_array_index == pid_pair_array_size) {
+        pid_pair_array_size *= 2;
+        pid_pair_array = castack_realloc(memstack,
+                                         pid_pair_array,
+                                         pid_pair_array_size);
+        }
+        pid_pair_array[pid_pair_array_index].child_pid = child_pid;
+        pid_pair_array[pid_pair_array_index].watched_pid = watched_pid;
+        pid_pair_array_index++;
 }
 
 static void memstack_clean(void)
 {
         castack_destroy(&memstack);
 }
-
-        /*
-        if (castack_empty(castack_ptr))
-                puts("It is empty!");
-        int *arr_ptr = castack_push(castack_ptr, 4, sizeof(int));
-        for (int i = 0; i < 4; ++i)
-                printf("%d\t", arr_ptr[i]);
-        putchar('\n');
-        if (!castack_empty(castack_ptr))
-                printf("Has %zu elements\n", castack_report(castack_ptr));
-        castack_destroy(castack_ptr);
-        */
