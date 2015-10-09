@@ -90,10 +90,6 @@ procwatch_loop_exit:
                 }
         }
 
-        for (size_t i = 0; i < pid_pair_array_index; ++i) {
-                free(pid_pair_array[i].process_name);
-        }
-
         loginfo.log_type = INFO_REPORT;
         pwlog_write(pwlog, &loginfo);
         fclose_or_die(pwlog);
@@ -468,7 +464,7 @@ static void pid_array_update(pid_t child_pid, pid_t watched_pid, const char *pro
         pid_pair_array[pid_pair_array_index].child_pid = child_pid;
         pid_pair_array[pid_pair_array_index].watched_pid = watched_pid;
         pid_pair_array[pid_pair_array_index].process_name = 
-                calloc(1, strlen(process_name) + 1);
+                castack_push(memstack, 1, strlen(process_name) + 1);
         strcpy(pid_pair_array[pid_pair_array_index].process_name, process_name);
         pid_pair_array_index++;
 }
