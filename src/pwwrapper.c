@@ -108,3 +108,13 @@ void close_or_die(int fd)
                 exit(EXIT_FAILURE);
         }
 }
+
+int fputs_or_die(const char *string, FILE *stream)
+{
+        int val;
+        if (EOF == (val = fputs(string, stream))) {
+                eprintf("fputs() : write failed\n");
+                exit(EXIT_FAILURE);
+        }
+        return val;
+}

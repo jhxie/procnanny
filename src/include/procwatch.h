@@ -19,7 +19,14 @@ struct pw_watched_pid_pair {
     pid_t watched_pid;
 };
 
-enum pw_log_type { INFO_INIT, INFO_NOEXIST, INFO_REPORT, ACTION_KILL,};
+
+struct pw_log_info {
+    enum { INFO_INIT, INFO_NOEXIST, INFO_REPORT, ACTION_KILL } log_type;
+    pid_t watched_pid;
+    unsigned   wait_threshold;
+    const char *process_name;
+    size_t num_term;
+};
 
 void procwatch(int argc, char **argv);
 
