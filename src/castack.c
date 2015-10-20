@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "castack.h"
+#include "pwwrapper.h"
 
 #define CS_ONLY
 #include "csutils.h"
@@ -21,19 +22,17 @@
  *A primitive application of OO ideology.
  */
 
- /*these 2 below may be put into the header*/
-typedef struct node_ *link;
-
+ /*these below may be put into the header*/
 struct castack {
-    link   head;
+    struct node_ *head;
     size_t numblk;
 };
- /*these 2 above may be put into the header*/
+ /*these above may be put into the header*/
 
 struct node_ {
     void *memblk;
     size_t blksize;
-    link next;
+    struct node_ *next;
 };
 
 /*
@@ -73,7 +72,7 @@ void *castack_realloc(struct castack *current_castack, void *mem, size_t size)
         }
 
         /*try find the memory block on the castack*/
-        link tmp_ptr = current_castack->head;
+        struct node_ *tmp_ptr = current_castack->head;
 
         while (tmp_ptr != NULL) {
                 if (tmp_ptr->memblk == mem)
@@ -110,7 +109,7 @@ void *castack_realloc(struct castack *current_castack, void *mem, size_t size)
 
 void castack_pop(struct castack *current_castack)
 {
-        link tmp_ptr = NULL;
+        struct node_ *tmp_ptr = NULL;
 
         if (current_castack->head != NULL) {
                 /*free the memory block pointed by individual node*/
@@ -135,7 +134,7 @@ size_t castack_report(struct castack *current_castack)
 
 void castack_free(struct castack *current_castack)
 {
-        link tmp_ptr = NULL;
+        struct node_ *tmp_ptr = NULL;
 
         /*similar to pop but with a loop*/
         while (current_castack->head != NULL) {
@@ -159,35 +158,11 @@ void castack_destroy(struct castack **current_castack)
 }
 
 /*All the functions that have internal linkage are listed below.*/
-static void *calloc_or_die_(size_t nmemb, size_t size)
-{
-        void *rtn_ptr = calloc(nmemb, size);
-
-        if (rtn_ptr == NULL) {
-                perror("calloc()");
-                exit(EXIT_FAILURE);
-        } else {
-                return rtn_ptr;
-        }
-}
-
-static void *realloc_or_die_(void *const ptr, size_t size)
-{
-        void *rtn_ptr = realloc(ptr, size);
-
-        if (rtn_ptr == NULL) {
-                free(ptr);
-                perror("realloc()");
-                exit(EXIT_FAILURE);
-        } else {
-                return rtn_ptr;
-        }
-}
 
 static void castack_pushnode_(struct castack *current_castack)
 {
         /*first allocate space for node*/
-        link memblk_ptr = calloc_or_die_(1, sizeof(struct node_));
+        struct node_ *memblk_ptr = calloc_or_die_(1, sizeof(struct node_));
 
         /*then link the node*/
         if (current_castack->head != NULL) {

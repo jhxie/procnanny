@@ -453,13 +453,16 @@ static void pwlog_write(FILE *pwlog, struct pw_log_info *loginfo)
         fflush(pwlog);
 }
 
-static void pid_array_update(pid_t child_pid, pid_t watched_pid, const char *process_name)
+static void pid_array_update(pid_t child_pid,
+                             pid_t watched_pid,
+                             const char *process_name)
 {
         if (pid_pair_array_index == pid_pair_array_size) {
         pid_pair_array_size *= 2;
         pid_pair_array = castack_realloc(memstack,
                                          pid_pair_array,
-                                         pid_pair_array_size);
+                                         pid_pair_array_size *
+                                         sizeof(struct pw_watched_pid_info));
         }
         pid_pair_array[pid_pair_array_index].child_pid = child_pid;
         pid_pair_array[pid_pair_array_index].watched_pid = watched_pid;

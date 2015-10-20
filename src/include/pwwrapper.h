@@ -2,8 +2,11 @@
 #define PW_WRAPPER_H_
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
+void *calloc_or_die_(size_t nmemb, size_t size);
+void *realloc_or_die_(void *const ptr, size_t size);
 FILE *fopen_or_die(const char *path, const char *mode);
 void fclose_or_die(FILE *stream);
 void fgetpos_or_die(FILE *stream, fpos_t *pos);

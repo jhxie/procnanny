@@ -13,6 +13,31 @@
 #include "pwwrapper.h"
 #include "memwatch.h"
 
+void *calloc_or_die_(size_t nmemb, size_t size)
+{
+        void *rtn_ptr = calloc(nmemb, size);
+
+        if (rtn_ptr == NULL) {
+                perror("calloc()");
+                exit(EXIT_FAILURE);
+        } else {
+                return rtn_ptr;
+        }
+}
+
+void *realloc_or_die_(void *const ptr, size_t size)
+{
+        void *rtn_ptr = realloc(ptr, size);
+
+        if (rtn_ptr == NULL) {
+                free(ptr);
+                perror("realloc()");
+                exit(EXIT_FAILURE);
+        } else {
+                return rtn_ptr;
+        }
+}
+
 FILE *fopen_or_die(const char *path, const char *mode)
 {
         FILE *file = fopen(path, mode);
