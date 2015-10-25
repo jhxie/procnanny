@@ -1,0 +1,4 @@
+getlogin() cannot be used to determine the current user name becuase
+it would always fail if the current process does not have a controlling
+terminal;
+use getpwuid(getuid()) instead.

@@ -37,3 +37,6 @@ memwatch.log
 
 # YCM files
 .ycm_extra_conf.pyc
+
+# log files
+log
