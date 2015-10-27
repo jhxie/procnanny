@@ -15,5 +15,5 @@ static void pwlog_write(FILE *pwlog, struct pw_log_info *loginfo);
 static void pid_array_update(pid_t child_pid,
                              pid_t watched_pid,
                              const char *process_name);
-
+static void pid_array_destroy(void);
 #endif

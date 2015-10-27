@@ -16,7 +16,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "castack.h"
 #include "procwatch.h"
 #include "pwwrapper.h"
 
@@ -40,7 +39,7 @@ void procwatch(int argc, char **argv)
         /*
          *This array is used to store the watched pid pairs
          */
-        pid_pair_array_size = 1;
+        pid_pair_array_size = 256;
         pid_pair_array = calloc_or_die(pid_pair_array_size,
                                         sizeof(struct pw_watched_pid_info));
         procclean();
@@ -364,9 +363,6 @@ static void work_dispatch(FILE *pwlog, struct pw_log_info *const loginfo)
 
 static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
 {
-        for (size_t i = 0; i < pid_pair_array_index; ++i)
-                free(pid_pair_array[i].process_name);
-        free(pid_pair_array);
 
         sleep(wait_threshold);
         /*
@@ -393,10 +389,12 @@ static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
                          *If the watched process no longer exist,
                          *the monitor action is considered "failed".
                          */
+			pid_array_destroy();
                         exit(EXIT_FAILURE);
                         break;
                 }
         }
+        pid_array_destroy();
         exit(EXIT_SUCCESS);
 }
 
@@ -471,4 +469,11 @@ static void pid_array_update(pid_t child_pid,
                 calloc_or_die(1, strlen(process_name) + 1);
         strcpy(pid_pair_array[pid_pair_array_index].process_name, process_name);
         pid_pair_array_index++;
+}
+
+static void pid_array_destroy(void)
+{
+        for (size_t i = 0; i < pid_pair_array_index; ++i)
+                free(pid_pair_array[i].process_name);
+        free(pid_pair_array);
 }
