@@ -41,7 +41,7 @@ void procwatch(int argc, char **argv)
          */
         pid_pair_array_size = 256;
         pid_pair_array = calloc_or_die(pid_pair_array_size,
-                                        sizeof(struct pw_watched_pid_info));
+                                       sizeof(struct pw_watched_pid_info));
         procclean();
         FILE *pwlog = pwlog_setup();
         struct pw_config_info confinfo = {};
@@ -64,7 +64,7 @@ void procwatch(int argc, char **argv)
                 }
         }
 procwatch_loop_exit:
-        
+
         /*
          *Once the main process has dispatched the work to all the
          *worker processes, wait for them to finish so they would
@@ -175,10 +175,10 @@ static unsigned config_parse_threshold(FILE *const nanny_cfg)
          *allocated by getline()
          */
         char linebuf[PW_LINEBUF_SIZE] = {};
-         /*
-          *dummy variable, since the case is ignored
-          *where the first line is not a valid number
-          */
+        /*
+         *dummy variable, since the case is ignored
+         *where the first line is not a valid number
+         */
         char *endptr = NULL;
         unsigned wait_period = 0;
 
@@ -279,7 +279,7 @@ parse_continue:
                  */
                 in_file = true;
         }
-                
+
         if (NULL == fgets(line_buf, sizeof line_buf, sed_filter_file)) {
                 if (feof(sed_filter_file)) {
                         fclose_or_die(sed_filter_file);
@@ -389,7 +389,7 @@ static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
                          *If the watched process no longer exist,
                          *the monitor action is considered "failed".
                          */
-			pid_array_destroy();
+                        pid_array_destroy();
                         exit(EXIT_FAILURE);
                         break;
                 }
@@ -421,6 +421,7 @@ static void pwlog_write(FILE *pwlog, struct pw_log_info *loginfo)
         /*Print the time field only*/
         fputs_or_die(timestr, pwlog);
         free(timestr);
+        timestr = NULL;
 
         /*
          *For the pid_t data type, POSIX standard                    
