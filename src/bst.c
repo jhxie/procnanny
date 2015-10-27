@@ -18,7 +18,7 @@ struct bst_node_ {
 
 struct bst *bst_init(void)
 {
-        struct bst *new_bst = calloc_or_die_(1, sizeof(struct bst));
+        struct bst *new_bst = calloc_or_die(1, sizeof(struct bst));
 
         /*redundant but logical*/
         new_bst->numnode = 0;
@@ -56,10 +56,10 @@ void *bst_insert(struct bst *current_bst, size_t nmemb, size_t size)
         if (NULL == current_bst)
                 return NULL;
 
-        struct bst_node_ *bstnode = calloc_or_die_(1, sizeof(struct bst_node_));
+        struct bst_node_ *bstnode = calloc_or_die(1, sizeof(struct bst_node_));
 
         current_bst->numnode++;
-        bstnode->memblk = calloc_or_die_(nmemb, size);
+        bstnode->memblk = calloc_or_die(nmemb, size);
         bstnode->blksize = nmemb * size;
         /*again, redundant*/
         bstnode->linkchain[BST_LEFT_CHAIN] = NULL;

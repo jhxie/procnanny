@@ -41,7 +41,7 @@ struct node_ {
  */
 struct castack *castack_init(void)
 {
-        struct castack *new_castack = calloc_or_die_(1, sizeof(struct castack));
+        struct castack *new_castack = calloc_or_die(1, sizeof(struct castack));
         new_castack->numblk = 0;
         new_castack->head = NULL;
 
@@ -54,7 +54,7 @@ void *castack_push(struct castack *current_castack, size_t nmemb, size_t size)
         /*lastly allocate space for the memblk field of new node*/
         current_castack->head->blksize = nmemb * size;
 
-        return current_castack->head->memblk = calloc_or_die_(nmemb, size);
+        return current_castack->head->memblk = calloc_or_die(nmemb, size);
 }
 
 void *castack_realloc(struct castack *current_castack, void *mem, size_t size)
@@ -68,7 +68,7 @@ void *castack_realloc(struct castack *current_castack, void *mem, size_t size)
         if (mem == NULL) {
                 castack_pushnode_(current_castack);
                 current_castack->head->blksize = size;
-                return current_castack->head->memblk = calloc_or_die_(1, size);
+                return current_castack->head->memblk = calloc_or_die(1, size);
         }
 
         /*try find the memory block on the castack*/
@@ -95,7 +95,7 @@ void *castack_realloc(struct castack *current_castack, void *mem, size_t size)
                  *if the old block size is greater than the new block size,
                  *we do not need to worry about anything else
                  */
-                tmp_ptr->memblk = realloc_or_die_(tmp_ptr->memblk, size);
+                tmp_ptr->memblk = realloc_or_die(tmp_ptr->memblk, size);
                 if (tmp_ptr->blksize < size) {
                         memset(tmp_ptr->memblk + tmp_ptr->blksize,
                                0,
@@ -162,7 +162,7 @@ void castack_destroy(struct castack **current_castack)
 static void castack_pushnode_(struct castack *current_castack)
 {
         /*first allocate space for node*/
-        struct node_ *memblk_ptr = calloc_or_die_(1, sizeof(struct node_));
+        struct node_ *memblk_ptr = calloc_or_die(1, sizeof(struct node_));
 
         /*then link the node*/
         if (current_castack->head != NULL) {

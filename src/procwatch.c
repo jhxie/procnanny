@@ -28,7 +28,6 @@
 
 
 enum { PW_LINEBUF_SIZE = 1024 };
-static struct castack *memstack = NULL;
 static struct pw_watched_pid_info *pid_pair_array = NULL;
 size_t pid_pair_array_size = 0;
 size_t pid_pair_array_index = 0;
@@ -37,17 +36,13 @@ void procwatch(int argc, char **argv)
 {
         /*Make stdout unbuffered.*/
         setbuf(stdout, NULL);
-        memstack = castack_init();
-        PW_MEMSTACK_ENABLE_AUTO_CLEAN();
 
         /*
          *This array is used to store the watched pid pairs
          */
-        pid_pair_array_size = 256;
-        pid_pair_array =
-                castack_push(memstack,
-                             pid_pair_array_size,
-                             sizeof(struct pw_watched_pid_info));
+        pid_pair_array_size = 1;
+        pid_pair_array = calloc_or_die(pid_pair_array_size,
+                                        sizeof(struct pw_watched_pid_info));
         procclean();
         FILE *pwlog = pwlog_setup();
         struct pw_config_info confinfo = {};
@@ -87,12 +82,14 @@ procwatch_loop_exit:
                         loginfo.watched_pid = pid_pair_array[i].watched_pid;
                         loginfo.process_name = pid_pair_array[i].process_name;
                         pwlog_write(pwlog, &loginfo);
+                        free(pid_pair_array[i].process_name);
                 }
         }
 
         loginfo.log_type = INFO_REPORT;
         pwlog_write(pwlog, &loginfo);
         fclose_or_die(pwlog);
+        free(pid_pair_array);
 }
 
 
@@ -256,7 +253,7 @@ static char *config_parse_pname(const char *const nanny_cfg_name)
         for (size_t i = 0; i < 4; ++i)
                 cat_str_size += strlen(cmd_options[i]);
 
-        char *cmd_buffer  = castack_push(memstack, 1, cat_str_size);
+        char *cmd_buffer  = calloc_or_die(1, cat_str_size);
 
         /*put all the strings in the buffer*/
         for (size_t i = 0; i < 4; ++i)
@@ -267,8 +264,8 @@ static char *config_parse_pname(const char *const nanny_cfg_name)
                         "while executing child process");
                 exit(EXIT_FAILURE);
         }
-         /*optional, since PW_MEMSTACK_ENABLE_AUTO_CLEAN macro is present*/
-        castack_pop(memstack);
+
+        free(cmd_buffer);
         cmd_buffer = NULL;
 
 parse_continue:
@@ -314,7 +311,7 @@ static void work_dispatch(FILE *pwlog, struct pw_log_info *const loginfo)
                 strlen(pidof_filter) +
                 strlen(loginfo->process_name) +
                 strlen(tr_filter)    + 1;
-        char *cmd_buffer = castack_push(memstack, 1, cat_str_size);
+        char *cmd_buffer = calloc_or_die(1, cat_str_size);
         FILE *pidof_pipe = NULL;
 
         snprintf(cmd_buffer, cat_str_size, "%s%s%s",
@@ -323,8 +320,8 @@ static void work_dispatch(FILE *pwlog, struct pw_log_info *const loginfo)
                  tr_filter);
 
         pidof_pipe = popen_or_die(cmd_buffer, "r");
-        /*again, this is optional*/
-        castack_pop(memstack);
+
+        free(cmd_buffer);
         cmd_buffer = NULL;
 
         bool process_not_found = true;
@@ -367,6 +364,10 @@ static void work_dispatch(FILE *pwlog, struct pw_log_info *const loginfo)
 
 static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
 {
+        for (size_t i = 0; i < pid_pair_array_index; ++i)
+                free(pid_pair_array[i].process_name);
+        free(pid_pair_array);
+
         sleep(wait_threshold);
         /*
          *Even though the checking is performed on errno after the
@@ -417,10 +418,11 @@ static void pwlog_write(FILE *pwlog, struct pw_log_info *loginfo)
         strftime(timebuf, PW_LINEBUF_SIZE, "%a %b %d %T %Z %Y", cal);
 
         /*Note the constant reserves space for both square brackets*/
-        char *timestr = castack_push(memstack, 1, strlen(timebuf) + 3);
+        char *timestr = calloc_or_die(1, strlen(timebuf) + 3);
         snprintf(timestr, strlen(timebuf) + 3, "[%s]", timebuf);
         /*Print the time field only*/
         fputs_or_die(timestr, pwlog);
+        free(timestr);
 
         /*
          *For the pid_t data type, POSIX standard                    
@@ -458,21 +460,15 @@ static void pid_array_update(pid_t child_pid,
                              const char *process_name)
 {
         if (pid_pair_array_index == pid_pair_array_size) {
-        pid_pair_array_size *= 2;
-        pid_pair_array = castack_realloc(memstack,
-                                         pid_pair_array,
-                                         pid_pair_array_size *
-                                         sizeof(struct pw_watched_pid_info));
+                pid_pair_array_size *= 2;
+                pid_pair_array = realloc_or_die(pid_pair_array,
+                                                pid_pair_array_size *
+                                                sizeof(struct pw_watched_pid_info));
         }
         pid_pair_array[pid_pair_array_index].child_pid = child_pid;
         pid_pair_array[pid_pair_array_index].watched_pid = watched_pid;
         pid_pair_array[pid_pair_array_index].process_name = 
-                castack_push(memstack, 1, strlen(process_name) + 1);
+                calloc_or_die(1, strlen(process_name) + 1);
         strcpy(pid_pair_array[pid_pair_array_index].process_name, process_name);
         pid_pair_array_index++;
-}
-
-static void memstack_clean(void)
-{
-        castack_destroy(&memstack);
 }

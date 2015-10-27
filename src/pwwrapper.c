@@ -13,7 +13,7 @@
 #include "pwwrapper.h"
 #include "memwatch.h"
 
-void *calloc_or_die_(size_t nmemb, size_t size)
+void *calloc_or_die(size_t nmemb, size_t size)
 {
         void *rtn_ptr = calloc(nmemb, size);
 
@@ -25,7 +25,7 @@ void *calloc_or_die_(size_t nmemb, size_t size)
         }
 }
 
-void *realloc_or_die_(void *const ptr, size_t size)
+void *realloc_or_die(void *const ptr, size_t size)
 {
         void *rtn_ptr = realloc(ptr, size);
 
