@@ -10,6 +10,6 @@ struct pw_watched_pid_info {
     char *process_name;
 };
 
-void procwatch(int argc, char **argv);
+void procwatch(const char *const cfgname);
 
 #endif

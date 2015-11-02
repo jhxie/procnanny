@@ -30,10 +30,11 @@ static struct pw_watched_pid_info *pid_pair_array = NULL;
 size_t pid_pair_array_size = 0;
 size_t pid_pair_array_index = 0;
 
-void procwatch(int argc, char **argv)
+void procwatch(const char *const cfgname)
 {
         /*Make stdout unbuffered.*/
         setbuf(stdout, NULL);
+        procclean();
 
         /*
          *This array is used to store the watched pid pairs
@@ -41,27 +42,25 @@ void procwatch(int argc, char **argv)
         pid_pair_array_size = 256;
         pid_pair_array = calloc_or_die(pid_pair_array_size,
                                        sizeof(struct pw_watched_pid_info));
-        procclean();
-        bool endfile = false;
+        char linebuf[PW_LINEBUF_SIZE] = {};
         FILE *pwlog = pwlog_setup();
-        struct pw_config_info confinfo = {};
+        FILE *nanny_cfg = fopen_or_die(cfgname, "r");
         struct pw_log_info loginfo = {};
         int child_return_status;
 
-        while (false == endfile) {
-                confinfo = config_parse(argc, argv);
-                switch (confinfo.type) {
-                case PW_PROCESS_NAME:
-                        loginfo.process_name = confinfo.data.process_name;
-                        work_dispatch(pwlog, &loginfo);
-                        break;
-                case PW_WAIT_THRESHOLD:
-                        loginfo.wait_threshold = confinfo.data.wait_threshold;
-                        break;
-                case PW_END_FILE:
-                        endfile = true;
-                        break;
-                }
+        while (NULL != fgets(linebuf, PW_LINEBUF_SIZE, nanny_cfg)) {
+                /*fgets() leaves the newline character untouched, so kill it*/
+                linebuf[strlen(linebuf) - 1] = '\0';
+                config_parse(&loginfo, linebuf);
+                work_dispatch(pwlog, &loginfo);
+        }
+
+        /*Check whether the NULL returned by fgets() is caused by EOF*/
+        if (feof(nanny_cfg)) {
+                fclose_or_die(nanny_cfg);
+        } else {
+                perror("fgets()");
+                exit(EXIT_FAILURE);
         }
 
         /*

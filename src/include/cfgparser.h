@@ -1,13 +1,7 @@
 #ifndef CFGPARSER_H_
 #define CFGPARSER_H_
 
-struct pw_config_info {
-    enum { PW_WAIT_THRESHOLD, PW_PROCESS_NAME, PW_END_FILE } type;
-    union {
-        unsigned   wait_threshold;
-        const char *process_name;
-    } data;
-};
+#include "pwlog.h"
 
-struct pw_config_info config_parse(int argc, char **argv);
+void config_parse(struct pw_log_info *const pwlog, const char *const cfgline);
 #endif

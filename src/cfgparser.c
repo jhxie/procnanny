@@ -12,12 +12,14 @@
 
 #include "cfgparser.h"
 #include "pwwrapper.h"
+#include "pwlog.h"
 
 #define CFG_ONLY
 #include "cfgutils.h"
 #undef CFG_ONLY
 
 #include "memwatch.h"
+
 /*
  *According to the assignment specification,
  *"The program procnanny takes exactly one command-line argument that specifies
@@ -29,10 +31,9 @@
  *Note: this function dispatches its 2 kinds of work(threashold or process name)
  *to 2 separate functions.
  */
-struct pw_config_info config_parse(int argc, char **argv)
+void config_parse(struct pw_log_info *const pwlog, const char *const cfgline)
 {
         static bool parsing_threshold = true;
-        static struct pw_config_info info;
 
         if (false == parsing_threshold) {
                 info.type = PW_PROCESS_NAME;
@@ -49,16 +50,7 @@ struct pw_config_info config_parse(int argc, char **argv)
                 info.type = PW_WAIT_THRESHOLD;
         }
 
-        if (2 != argc) {
-                eprintf("Usage: %s [FILE]\n", argv[0]);
-                exit(EXIT_FAILURE);
-        }
-
-        FILE *nanny_cfg = NULL;
-        nanny_cfg = fopen_or_die(argv[1], "r");
         info.data.wait_threshold = config_parse_threshold(nanny_cfg);
-        fclose_or_die(nanny_cfg);
-        return info;
 }
 
 /*
