@@ -1,0 +1,7 @@
+-x
+c
+-DMEMWATCH
+-DMW_STDIO
+-I./src/include
+-Wall
+-std=gnu99

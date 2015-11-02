@@ -5,6 +5,19 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#define eprintf(...) fprintf(stderr, __VA_ARGS__)
+/*
+ *cfree(clean free)
+ *set the pointer to NULL after free
+ */
+#define cfree(ptr) \
+        do { \
+                free(ptr); \
+                ptr = NULL; \
+        } while (0)
+
+enum { PW_LINEBUF_SIZE = 1024 };
+
 void *calloc_or_die(size_t nmemb, size_t size);
 void *realloc_or_die(void *const ptr, size_t size);
 FILE *fopen_or_die(const char *path, const char *mode);
