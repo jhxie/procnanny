@@ -3,5 +3,5 @@
 
 #include "pwlog.h"
 
-void config_parse(struct pw_log_info *const pwlog, const char *const cfgline);
+void config_parse(struct pw_log_info *const pwlog, char *const cfgline);
 #endif

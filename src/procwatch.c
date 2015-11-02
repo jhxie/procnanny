@@ -78,6 +78,7 @@ void procwatch(const char *const cfgname)
                         loginfo.log_type = ACTION_KILL;
                         loginfo.watched_pid = pid_pair_array[i].watched_pid;
                         loginfo.process_name = pid_pair_array[i].process_name;
+                        loginfo.wait_threshold = pid_pair_array[i].wait_threshold;
                         pwlog_write(pwlog, &loginfo);
                         cfree(pid_pair_array[i].process_name);
                 }
@@ -120,7 +121,6 @@ static void work_dispatch(FILE *pwlog, struct pw_log_info *const loginfo)
 {
         /*
          *ASSUMPTION: the length of a line is no more than 1023 characters
-         *(same as config_parse_threshold())
          */
         const char *const pidof_filter = "pidof -x ";
         const char *const tr_filter = " | tr \' \' \'\n\'";
@@ -166,7 +166,8 @@ static void work_dispatch(FILE *pwlog, struct pw_log_info *const loginfo)
                         pwlog_write(pwlog, loginfo);
                         pid_array_update(child_pid,
                                          watched_pid,
-                                         loginfo->process_name);
+                                         loginfo->process_name,
+                                         loginfo->wait_threshold);
                         break;
                 }
         }
@@ -217,7 +218,8 @@ static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
 
 static void pid_array_update(pid_t child_pid,
                              pid_t watched_pid,
-                             const char *process_name)
+                             const char *process_name,
+                             unsigned wait_threshold)
 {
         if (pid_pair_array_index == pid_pair_array_size) {
                 pid_pair_array_size *= 2;
@@ -230,6 +232,7 @@ static void pid_array_update(pid_t child_pid,
         pid_pair_array[pid_pair_array_index].process_name = 
                 calloc_or_die(1, strlen(process_name) + 1);
         strcpy(pid_pair_array[pid_pair_array_index].process_name, process_name);
+        pid_pair_array[pid_pair_array_index].wait_threshold = wait_threshold;
         pid_pair_array_index++;
 }
 
