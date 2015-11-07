@@ -27,8 +27,8 @@
 #include "memwatch.h"
 
 static struct pw_watched_pid_info *pid_pair_array = NULL;
-size_t pid_pair_array_size = 0;
-size_t pid_pair_array_index = 0;
+static size_t pid_pair_array_size                 = 0;
+static size_t pid_pair_array_index                = 0;
 
 void procwatch(const char *const cfgname)
 {
@@ -80,14 +80,14 @@ void procwatch(const char *const cfgname)
                         loginfo.process_name = pid_pair_array[i].process_name;
                         loginfo.wait_threshold = pid_pair_array[i].wait_threshold;
                         pwlog_write(pwlog, &loginfo);
-                        cfree(pid_pair_array[i].process_name);
+                        zerofree(pid_pair_array[i].process_name);
                 }
         }
 
         loginfo.log_type = INFO_REPORT;
         pwlog_write(pwlog, &loginfo);
         fclose_or_die(pwlog);
-        cfree(pid_pair_array);
+        zerofree(pid_pair_array);
 }
 
 static void procclean(void)
@@ -138,7 +138,7 @@ static void work_dispatch(FILE *pwlog, struct pw_log_info *const loginfo)
 
         pidof_pipe = popen_or_die(cmd_buffer, "r");
 
-        cfree(cmd_buffer);
+        zerofree(cmd_buffer);
 
         bool process_not_found = true;
         char linebuf[PW_LINEBUF_SIZE] = {};
@@ -239,7 +239,7 @@ static void pid_array_update(pid_t child_pid,
 static void pid_array_destroy(void)
 {
         for (size_t i = 0; i < pid_pair_array_index; ++i) {
-                cfree(pid_pair_array[i].process_name);
+                zerofree(pid_pair_array[i].process_name);
         }
-        cfree(pid_pair_array);
+        zerofree(pid_pair_array);
 }

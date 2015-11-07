@@ -10,7 +10,7 @@
  *cfree(clean free)
  *set the pointer to NULL after free
  */
-#define cfree(ptr) \
+#define zerofree(ptr) \
         do { \
                 free(ptr); \
                 ptr = NULL; \

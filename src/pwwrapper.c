@@ -2,6 +2,12 @@
 #define _GNU_SOURCE
 #endif
 
+#include <features.h>
+/*secure_getenv first appeared in glibc 2.17*/
+#if !(__GLIBC__ == 2 && __GLIBC_MINOR__ >= 17)
+#error "This software requires the glibc to be at least 2.17"
+#endif
+
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>

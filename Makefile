@@ -1,12 +1,12 @@
-CC := gcc
-CFLAGS := -Wall -std=gnu99
-MWFLAGS := -DMEMWATCH -DMW_STDIO
+CC       := gcc
+CFLAGS   := -Wall -std=gnu99
+MWFLAGS  := -DMEMWATCH -DMW_STDIO
 INCFLAGS := -I./src/include
-SRCS := $(wildcard ./src/*.c)
-SRCSDIR := src
-BINSDIR := bin
+SRCS     := $(wildcard ./src/*.c)
+SRCSDIR  := src
+BINSDIR  := bin
 BUILDDIR := build
-OBJS := $(SRCS:.c=.o)
+OBJS     := $(SRCS:.c=.o)
 
 all: $(BINSDIR)/procnanny
 
@@ -37,4 +37,5 @@ debug_objs: $(SRCS)
 	$(CC) $(CFLAGS) $(MWFLAGS) $(INCFLAGS) -c $^ -g3 -O0
 	-mv *.o $(SRCSDIR)
 
+.PHONY: all rebuild debug rebuild_debug clean
 .IGNORE:

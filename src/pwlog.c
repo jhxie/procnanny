@@ -34,7 +34,7 @@ void pwlog_write(FILE *pwlog, struct pw_log_info *loginfo)
         snprintf(timestr, strlen(timebuf) + 3, "[%s]", timebuf);
         /*Print the time field only*/
         fputs_or_die(timestr, pwlog);
-        cfree(timestr);
+        zerofree(timestr);
 
         /*
          *For the pid_t data type, POSIX standard                    

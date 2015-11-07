@@ -27,3 +27,9 @@ TA Name:             Luke Nitish Kumar
   process is killed, we still have a potential problem
   of killing some other processes end up with the
   pid same as the one before.
+
+3.The configuration file is ALWAYS VALID: there cannot be redundant lines with
+  identical information or a "re-definition" like "coredumpctl 8" and then
+  there is a line "coredumpctl 10" appear in the configuration file at the same
+  time; however, "re-definition" is allowed if the file is re-read (caught a
+  SIGHUP signal).
