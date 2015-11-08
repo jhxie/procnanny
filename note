@@ -2,3 +2,7 @@ getlogin() cannot be used to determine the current user name becuase
 it would always fail if the current process does not have a controlling
 terminal;
 use getpwuid(getuid()) instead.
+
+SUSv3 requires that PIPE_BUF be at least _POSIX_PIPE_BUF (512). An
+implementation should define PIPE_BUF (in <limits.h>) and/or allow the call
+fpathconf(fd, _PC_PIPE_BUF) to return the actual upper limit for atomic writes.
