@@ -8,6 +8,7 @@
 #define _GNU_SOURCE
 #endif
 
+#include <err.h>
 #include <errno.h>
 #include <inttypes.h> /*for strtoumax()*/ 
 #include <stdbool.h>
@@ -77,9 +78,9 @@ size_t config_parse(const char *const cfgname)
         }
 
         if (PW_CFG_MAX_NUM_PROGRAM_NAME == i) {
-                eprintf("The 128 program name assumption in the specification"
-                        " is violated, terminate the program.");
-                exit(EXIT_FAILURE);
+                errx(EXIT_FAILURE,
+                     "The 128 program name assumption in the specification"
+                     " is violated, terminate the program");
         }
         return i;
 }
@@ -94,9 +95,8 @@ static unsigned config_parse_threshold(char *const cfgline, char *saveptr)
         errno = 0;
         tmp = strtoumax(threshold_token, &endptr, WAIT_THRESHOLD_BASE);
         if (0 == tmp && threshold_token == endptr) {
-                eprintf("strtoumax() : "
-                        "the line does not contain a valid wait threshold\n");
-                exit(EXIT_FAILURE);
+                errx(EXIT_FAILURE, "strtoumax() : "
+                     "the line does not contain a valid wait threshold");
         }
         /*checks overflow error*/
         if (UINTMAX_MAX == tmp && ERANGE == errno) {
@@ -106,11 +106,9 @@ static unsigned config_parse_threshold(char *const cfgline, char *saveptr)
 
         wait_threshold = tmp;
         if (wait_threshold != tmp) {
-                eprintf("strtoumax() : "
-                        "number of seconds to wait "
-                        "exceeds the capacity of an "
-                        "unsigned integer\n");
-                exit(EXIT_FAILURE);
+                errx(EXIT_FAILURE, "strtoumax() : "
+                     "number of seconds to wait exceeds the capacity of an "
+                     "unsigned integer");
         }
         return wait_threshold;
 }
@@ -120,9 +118,8 @@ static char *config_parse_pname(char *const cfgline, char **saveptr)
         char *pname_token = strtok_r(cfgline, CFG_WHITESPACE, saveptr);
 
         if (NULL == pname_token) {
-                eprintf("strtok_r() : "
-                        "the line does not contain a valid process name\n");
-                exit(EXIT_FAILURE);
+                errx(EXIT_FAILURE, "strtok_r() : "
+                        "the line does not contain a valid process name");
         }
 
         return pname_token;

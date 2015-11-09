@@ -6,8 +6,10 @@
 #include <unistd.h>
 
 /*
- *based on the variadic macro expansion example from
+ *Based on the variadic macro expansion example from
  *https://gcc.gnu.org/onlinedocs/cpp/Variadic-Macros.html
+ *Not used since part II -- 4.4BSD series of err functions
+ *are better alternatives
  */
 #define eprintf(...) fprintf(stderr, __VA_ARGS__)
 /*

@@ -8,6 +8,7 @@
 #error "This software requires the glibc to be at least 2.17"
 #endif
 
+#include <err.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -118,8 +119,8 @@ const char *secure_getenv_or_die(const char *name)
 {
         const char *val;
         if (NULL == (val = secure_getenv(name))) {
-                eprintf("The environment variable %s does not exist\n", name);
-                exit(EXIT_FAILURE);
+                errx(EXIT_FAILURE,
+                     "The environment variable %s does not exist", name);
         }
         return val;
 }
@@ -146,8 +147,7 @@ int fputs_or_die(const char *string, FILE *stream)
 {
         int val;
         if (EOF == (val = fputs(string, stream))) {
-                eprintf("fputs() : write failed\n");
-                exit(EXIT_FAILURE);
+                errx(EXIT_FAILURE, "fputs() : write failed");
         }
         return val;
 }

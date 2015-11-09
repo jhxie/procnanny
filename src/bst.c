@@ -1,10 +1,22 @@
 /*
  *Note: this implementation is based on the concepts and code examples from
  *http://www.eternallyconfuzzled.com/tuts/datastructures/jsw_tut_bst1.aspx
- *the code is modified heavily to suit the need of procnanny.
+ *the code is modified extensively to suit the need of procnanny.
  */
+#ifdef _POSIX_C_SOURCE
+#undef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+
+#include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h> /*MAX_SIZE definition*/
+
+#ifdef BST_DEBUG
+#include <string.h>
+#include <unistd.h>
+#endif
 
 #include "bst.h"
 #include "pwwrapper.h"
@@ -42,8 +54,10 @@ void *bst_find(struct bst *current_bst, long key)
          *avoid undefined behavior by returning directly
          *rather than trying to dereference a NULL pointer
          */
-        if (NULL == current_bst)
+        if (NULL == current_bst) {
+                errno = EINVAL;
                 return NULL;
+        }
 
         enum bst_chain_dir dir    = BST_LEFT_CHAIN;
         struct bst_node_ *tmp_ptr = current_bst->root;
@@ -62,12 +76,23 @@ void *bst_find(struct bst *current_bst, long key)
 
 void *bst_add(struct bst *current_bst, long key, size_t blknum, size_t blksize)
 {
-        if (NULL == current_bst)
+        if (NULL == current_bst) {
+                errno = EINVAL;
                 return NULL;
+        }
 
         struct bst_node_ *bstnode = calloc_or_die(1, sizeof(struct bst_node_));
 
         current_bst->numnode++;
+        if (current_bst->numnode + 1 == SIZE_MAX) {
+#ifdef BST_DEBUG
+                const char *const err_msg = "bst: max node count reached\n";
+                write(STDERR_FILENO, err_msg, strlen(err_msg));
+#endif
+                errno = EOVERFLOW;
+                return NULL;
+        }
+
         bstnode->key                        = key;
         bstnode->memblk                     = calloc_or_die(blknum, blksize);
         bstnode->blknum                     = blknum;
