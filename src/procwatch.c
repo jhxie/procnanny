@@ -53,13 +53,11 @@ void procwatch(const char *const cfgname)
         FILE *pwlog = pwlog_setup();
         struct pw_log_info loginfo = {};
         int child_return_status;
-        config_parse(cfgname);
+        size_t numcfgline = config_parse(cfgname);
 
-        for (struct pw_cfg_info *cfg_iterator = pw_cfg_vector;
-             cfg_iterator->process_name[0] != '\0';
-             ++cfg_iterator) {
-                loginfo.process_name = cfg_iterator->process_name;
-                loginfo.wait_threshold = cfg_iterator->wait_threshold;
+        for (size_t i = 0; i < numcfgline; ++i) {
+                loginfo.process_name   = pw_cfg_vector[i].process_name;
+                loginfo.wait_threshold = pw_cfg_vector[i].wait_threshold;
                 work_dispatch(pwlog, &loginfo);
         }
 
@@ -212,6 +210,7 @@ static FILE *pidof_popen(const char *const process_name)
          */
         const char *const pidof_filter = "pidof -x ";
         const char *const tr_filter = " | tr \' \' \'\n\'";
+        FILE *pidof_pipe = NULL;
         size_t cat_str_size =
                 strlen(pidof_filter) +
                 strlen(process_name) +
@@ -222,9 +221,10 @@ static FILE *pidof_popen(const char *const process_name)
                  pidof_filter,
                  process_name,
                  tr_filter);
+        pidof_pipe = popen_or_die(cmd_buffer, "r");
         zerofree(cmd_buffer);
 
-        return popen_or_die(cmd_buffer, "r");
+        return pidof_pipe;
 }
 
 /*

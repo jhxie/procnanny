@@ -20,5 +20,5 @@ enum { PW_CFG_MAX_NUM_PROGRAM_NAME = 128 };
 
 extern struct pw_cfg_info pw_cfg_vector[];
 
-void config_parse(const char *const cfgname);
+size_t config_parse(const char *const cfgname);
 #endif

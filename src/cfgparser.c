@@ -34,18 +34,11 @@
  */
 struct pw_cfg_info pw_cfg_vector[PW_CFG_MAX_NUM_PROGRAM_NAME];
 
-static size_t pw_cfg_idx                = 0;
 static const char *const CFG_WHITESPACE = "\t ";
 static const int WAIT_THRESHOLD_BASE    = 10;
 
-void config_parse(const char *const cfgname)
+size_t config_parse(const char *const cfgname)
 {
-        if (PW_CFG_MAX_NUM_PROGRAM_NAME == pw_cfg_idx) {
-                eprintf("The 128 program name assumption in the specification"
-                        " is violated, terminate the program.");
-                exit(EXIT_FAILURE);
-        }
-
         /*
          *Note here the saveptr is used for strtok_r to recover the context
          *left off by the first call; which occurred in config_parse_pname().
@@ -54,9 +47,13 @@ void config_parse(const char *const cfgname)
         char linebuf[PW_LINEBUF_SIZE] = {};
         /*for extra safety*/
         memset(linebuf, 0, PW_LINEBUF_SIZE);
+        size_t i;
         FILE *nanny_cfg = fopen_or_die(cfgname, "r");
 
-        while (NULL != fgets(linebuf, PW_LINEBUF_SIZE, nanny_cfg)) {
+        for (i = 0;
+             (i < PW_CFG_MAX_NUM_PROGRAM_NAME) &&
+             (NULL != fgets(linebuf, PW_LINEBUF_SIZE, nanny_cfg));
+             ++i) {
                 /*fgets() leaves the newline character untouched, so strip it*/
                 linebuf[strlen(linebuf) - 1] = '\0';
                 /*
@@ -64,15 +61,13 @@ void config_parse(const char *const cfgname)
                  *within a string MUST be less than or equal to the string
                  *itself
                  */
-                strcpy(pw_cfg_vector[pw_cfg_idx].process_name,
+                strcpy(pw_cfg_vector[i].process_name,
                         config_parse_pname(linebuf, &saveptr));
 
-                pw_cfg_vector[pw_cfg_idx].wait_threshold =
+                pw_cfg_vector[i].wait_threshold =
                         config_parse_threshold(linebuf, saveptr);
                 saveptr = NULL;
-                pw_cfg_idx++;
         }
-
         /*Check whether the NULL returned by fgets() is caused by EOF*/
         if (feof(nanny_cfg)) {
                 fclose_or_die(nanny_cfg);
@@ -80,6 +75,13 @@ void config_parse(const char *const cfgname)
                 perror("fgets()");
                 exit(EXIT_FAILURE);
         }
+
+        if (PW_CFG_MAX_NUM_PROGRAM_NAME == i) {
+                eprintf("The 128 program name assumption in the specification"
+                        " is violated, terminate the program.");
+                exit(EXIT_FAILURE);
+        }
+        return i;
 }
 
 static unsigned config_parse_threshold(char *const cfgline, char *saveptr)
