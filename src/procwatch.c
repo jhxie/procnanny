@@ -2,6 +2,7 @@
 #define _GNU_SOURCE
 #endif
 
+#include <err.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -15,6 +16,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "bst.h"
 #include "cfgparser.h"
 #include "procwatch.h"
 #include "pwlog.h"
@@ -27,10 +29,9 @@
 #include "memwatch.h"
 
 /*
-static struct pw_watched_pid_info *pid_pair_array = NULL;
-static size_t pid_pair_array_size                 = 0;
-static size_t pid_pair_array_index                = 0;
-*/
+ *watched_pid_bst is used for storing struct pw_watched_pid_info
+ */
+static struct bst *wpid_bst = NULL;
 static volatile sig_atomic_t sig_hup_flag = false;
 static volatile sig_atomic_t sig_int_flag = false;
 
@@ -40,15 +41,7 @@ void procwatch(const char *const cfgname)
         setbuf(stdout, NULL);
         procclean();
 
-        /*
-         *This array is used to store the watched pid pairs
-         */
-
-        /*
-        pid_pair_array_size = 256;
-        pid_pair_array = calloc_or_die(pid_pair_array_size,
-                                       sizeof(struct pw_watched_pid_info));
-        */
+        wpid_bst = bst_init();
         char linebuf[PW_LINEBUF_SIZE] = {};
         FILE *pwlog = pwlog_setup();
         struct pw_log_info loginfo = {};
@@ -86,6 +79,7 @@ void procwatch(const char *const cfgname)
         fclose_or_die(pwlog);
         zerofree(pid_pair_array);
         */
+        bst_destroy(&wpid_bst);
 }
 
 static void procclean(void)
@@ -125,20 +119,48 @@ static void work_dispatch(FILE *pwlog, const struct pw_cfg_info *const cfginfo)
                 .wait_threshold = cfginfo->wait_threshold,
                 .process_name = cfginfo->process_name
         };
+        struct pw_watched_pid_info wpid_info = {
+                .child_pid = 0,
+                .watched_pid = 0,
+                .cwait_threshold = cfginfo->wait_threshold,
+                .pwait_threshold = 0,
+        };
+        struct pw_watched_pid_info *tmp_ptr;
+        strcpy(wpid_info.process_name, cfginfo->process_name);
         uintmax_t watched_pid = 0;
         pid_t child_pid;
+        int tmp_fdes1[2], tmp_fdes2[2];
 
         while (NULL != fgets(linebuf, sizeof linebuf, pidof_pipe)) {
                 process_not_found = false;
                 watched_pid = strtoumax(linebuf, &endptr, 10);
 
+                /*
+                 *note I use 2 parallel unidirectional pipes to do ipc
+                 *between child and parent
+                 */
+
+                /*fill in the rest wpid_info*/
+                /*
+                 * +------+--------+-------+
+                 * |      | parent | child |
+                 * +------+--------+-------+
+                 * |pipe1 | read   | write |
+                 * |pipe2 | write  | read  |
+                 * +------+--------+-------+
+                 */
+                pipe_or_die(tmp_fdes1);
+                pipe_or_die(tmp_fdes2);
+                /*fill in the rest wpid_info*/
+
                 child_pid = fork_or_die();
                 switch (child_pid) {
                 case 0:
-                        pclose(pidof_pipe);
-                        fclose_or_die(pwlog);
-                        process_monitor(loginfo.wait_threshold,
-                                        (pid_t)watched_pid);
+                        WORK_DISPATCH_CHILD_CLEANUP();
+                        process_monitor((pid_t)watched_pid,
+                                        loginfo.wait_threshold,
+                                        tmp_fdes2[0],
+                                        tmp_fdes1[1]);
                         /*NEVER REACHED AGAIN*/
                         break;
                 default:
@@ -146,12 +168,21 @@ static void work_dispatch(FILE *pwlog, const struct pw_cfg_info *const cfginfo)
                         loginfo.log_type = INFO_INIT;
                         loginfo.watched_pid = (pid_t)watched_pid;
                         pwlog_write(pwlog, &loginfo);
+
+                        WORK_DISPATCH_PARENT_CLEANUP();
+                        errno = 0;
+                        tmp_ptr = bst_add(wpid_bst,
+                                          watched_pid,
+                                          1,
+                                          sizeof(struct pw_watched_pid_info));
+                        if (NULL != tmp_ptr) {
+                                *tmp_ptr = wpid_info;
+                        } else if (EOVERFLOW == errno || EINVAL == errno) {
+                                        errx(EXIT_FAILURE, "bst : error");
+                        }
                         /*
-                        pid_array_update(child_pid,
-                                         watched_pid,
-                                         loginfo->process_name,
-                                         loginfo->wait_threshold);
-                        */
+                         *the watched_pid has already been monitored, do nothing
+                         */
                         break;
                 }
         }
@@ -163,7 +194,10 @@ static void work_dispatch(FILE *pwlog, const struct pw_cfg_info *const cfginfo)
         pclose_or_die(pidof_pipe);
 }
 
-static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
+static void process_monitor(pid_t    watched_process_id,
+                            unsigned wait_threshold,
+                            int      readdes,
+                            int      writedes)
 {
 
         sleep(wait_threshold);
@@ -195,6 +229,8 @@ static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
                         /*
                         pid_array_destroy();
                         */
+                        close_or_die(readdes);
+                        close_or_die(writedes);
                         exit(EXIT_FAILURE);
                         break;
                 }
@@ -202,6 +238,8 @@ static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
         /*
         pid_array_destroy();
         */
+        close_or_die(readdes);
+        close_or_die(writedes);
         exit(EXIT_SUCCESS);
 }
 
@@ -228,33 +266,3 @@ static FILE *pidof_popenr(const char *const process_name)
 
         return pidof_pipe;
 }
-
-/*
-static void pid_array_update(pid_t child_pid,
-                             pid_t watched_pid,
-                             const char *process_name,
-                             unsigned wait_threshold)
-{
-        if (pid_pair_array_index == pid_pair_array_size) {
-                pid_pair_array_size *= 2;
-                pid_pair_array = realloc_or_die(pid_pair_array,
-                                                pid_pair_array_size *
-                                                sizeof(struct pw_watched_pid_info));
-        }
-        pid_pair_array[pid_pair_array_index].child_pid = child_pid;
-        pid_pair_array[pid_pair_array_index].watched_pid = watched_pid;
-        pid_pair_array[pid_pair_array_index].process_name = 
-                calloc_or_die(1, strlen(process_name) + 1);
-        strcpy(pid_pair_array[pid_pair_array_index].process_name, process_name);
-        pid_pair_array[pid_pair_array_index].wait_threshold = wait_threshold;
-        pid_pair_array_index++;
-}
-
-static void pid_array_destroy(void)
-{
-        for (size_t i = 0; i < pid_pair_array_index; ++i) {
-                zerofree(pid_pair_array[i].process_name);
-        }
-        zerofree(pid_pair_array);
-}
-*/

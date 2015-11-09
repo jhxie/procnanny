@@ -151,3 +151,11 @@ int fputs_or_die(const char *string, FILE *stream)
         }
         return val;
 }
+
+void pipe_or_die(int *pipefd)
+{
+        if (-1 == pipe(pipefd)) {
+                perror("pipe()");
+                exit(EXIT_FAILURE);
+        }
+}
