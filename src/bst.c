@@ -23,7 +23,7 @@
 
 #include "memwatch.h"
 
-enum bst_chain_dir { BST_LEFT_CHAIN, BST_RIGHT_CHAIN, BST_CHAINSIZE };
+enum bst_link_dir { BST_LEFT, BST_RIGHT, BST_LINKSIZE };
 
 struct bst_node_ {
         long key;
@@ -34,7 +34,7 @@ struct bst_node_ {
          */
         size_t blknum;  /* number of blocks */ 
         size_t blksize; /* size of each block */ 
-        struct bst_node_ *linkchain[BST_CHAINSIZE];
+        struct bst_node_ *link[BST_LINKSIZE];
 };
 
 struct bst *bst_init(void)
@@ -59,7 +59,7 @@ void *bst_find(struct bst *current_bst, long key)
                 return NULL;
         }
 
-        enum bst_chain_dir dir    = BST_LEFT_CHAIN;
+        enum bst_link_dir dir    = BST_LEFT;
         struct bst_node_ *tmp_ptr = current_bst->root;
 
         while (NULL != tmp_ptr) {
@@ -67,7 +67,7 @@ void *bst_find(struct bst *current_bst, long key)
                         break;
                 } else {
                         dir     = key > tmp_ptr->key;
-                        tmp_ptr = tmp_ptr->linkchain[dir];
+                        tmp_ptr = tmp_ptr->link[dir];
                 }
         }
 
@@ -98,8 +98,8 @@ void *bst_add(struct bst *current_bst, long key, size_t blknum, size_t blksize)
         bstnode->blknum                     = blknum;
         bstnode->blksize                    = blksize;
         /*again, redundant*/
-        bstnode->linkchain[BST_LEFT_CHAIN]  = NULL;
-        bstnode->linkchain[BST_RIGHT_CHAIN] = NULL;
+        bstnode->link[BST_LEFT]  = NULL;
+        bstnode->link[BST_RIGHT] = NULL;
         
         /*
          *start to insert the new node into the bst
@@ -107,7 +107,7 @@ void *bst_add(struct bst *current_bst, long key, size_t blknum, size_t blksize)
         if (NULL == current_bst->root) {
                 current_bst->root = bstnode;
         } else {
-                enum bst_chain_dir dir    = BST_LEFT_CHAIN;
+                enum bst_link_dir dir    = BST_LEFT;
                 struct bst_node_ *tmp_ptr = current_bst->root;
 
                 while (true) {
@@ -117,14 +117,80 @@ void *bst_add(struct bst *current_bst, long key, size_t blknum, size_t blksize)
 
                         dir = bstnode->key > tmp_ptr->key;
 
-                        if (NULL == tmp_ptr->linkchain[dir])
+                        if (NULL == tmp_ptr->link[dir])
                                 break;
 
-                        tmp_ptr = tmp_ptr->linkchain[dir];
+                        tmp_ptr = tmp_ptr->link[dir];
                 }
-                tmp_ptr->linkchain[dir] = bstnode;
+                tmp_ptr->link[dir] = bstnode;
         }
 
         return bstnode->memblk;
 }
 
+int bst_del(struct bst *current_bst, long key)
+{
+        if (NULL == current_bst) {
+                errno = EINVAL;
+                return -1;
+        }
+
+        if (NULL != current_bst->root) {
+                struct bst_node_ head                   = {};
+                struct bst_node_ *tmp_ptr               = &head;
+                struct bst_node_ *p_ptr, *f_ptr = NULL;
+                enum bst_link_dir dir                   = BST_RIGHT;
+
+                /*make the new node's right chain pointer point to the root*/
+                tmp_ptr->link[BST_RIGHT] = current_bst->root;
+
+                while (NULL != tmp_ptr->link[dir]) {
+                        p_ptr = tmp_ptr;
+                        tmp_ptr = tmp_ptr->link[dir];
+                        dir = key >= tmp_ptr->key;
+
+                        if (key == tmp_ptr->key) {
+                                f_ptr = tmp_ptr;
+                        }
+                }
+
+                if (NULL != f_ptr) {
+                        f_ptr->key = tmp_ptr->key;
+                        f_ptr->blknum = tmp_ptr->blknum;
+                        f_ptr->blksize = tmp_ptr->blksize;
+                        free(f_ptr->memblk);
+                        f_ptr->memblk = tmp_ptr->memblk;
+                        p_ptr->link[tmp_ptr == p_ptr->link[BST_RIGHT]] =
+                                tmp_ptr->link[NULL == tmp_ptr->link[BST_LEFT]];
+                        free(tmp_ptr);
+                }
+                current_bst->root = head.link[BST_RIGHT];
+        }
+        return 0;
+}
+
+int bst_destroy(struct bst **current_bst)
+{
+        if (NULL == current_bst || NULL == *current_bst) {
+                errno = EINVAL;
+                return -1;
+        }
+
+        struct bst_node_ *tmp_ptr = (*current_bst)->root;
+        struct bst_node_ *saveptr;
+
+        while (NULL != tmp_ptr) {
+                if (NULL != tmp_ptr->link[BST_LEFT]) {
+                        saveptr = tmp_ptr->link[BST_LEFT];
+                        tmp_ptr->link[BST_LEFT] = saveptr->link[BST_RIGHT];
+                        saveptr->link[BST_RIGHT] = tmp_ptr;
+                } else {
+                        saveptr = tmp_ptr->link[BST_RIGHT];
+                        free(tmp_ptr->memblk);
+                        free(tmp_ptr);
+                }
+                tmp_ptr = saveptr;
+        }
+        *current_bst = NULL;
+        return 0;
+}
