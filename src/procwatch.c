@@ -26,9 +26,13 @@
 
 #include "memwatch.h"
 
+/*
 static struct pw_watched_pid_info *pid_pair_array = NULL;
 static size_t pid_pair_array_size                 = 0;
 static size_t pid_pair_array_index                = 0;
+*/
+static volatile sig_atomic_t sig_hup_flag = false;
+static volatile sig_atomic_t sig_int_flag = false;
 
 void procwatch(const char *const cfgname)
 {
@@ -117,30 +121,10 @@ static void procclean(void)
 
 static void work_dispatch(FILE *pwlog, struct pw_log_info *const loginfo)
 {
-        /*
-         *ASSUMPTION: the length of a line is no more than 1023 characters
-         */
-        const char *const pidof_filter = "pidof -x ";
-        const char *const tr_filter = " | tr \' \' \'\n\'";
-        size_t cat_str_size =
-                strlen(pidof_filter) +
-                strlen(loginfo->process_name) +
-                strlen(tr_filter)    + 1;
-        char *cmd_buffer = calloc_or_die(1, cat_str_size);
-        FILE *pidof_pipe = NULL;
-
-        snprintf(cmd_buffer, cat_str_size, "%s%s%s",
-                 pidof_filter,
-                 loginfo->process_name,
-                 tr_filter);
-
-        pidof_pipe = popen_or_die(cmd_buffer, "r");
-
-        zerofree(cmd_buffer);
-
         bool process_not_found = true;
         char linebuf[PW_LINEBUF_SIZE] = {};
         char *endptr = NULL;
+        FILE *pidof_pipe = pidof_popen(loginfo->process_name);
         uintmax_t watched_pid = 0;
         pid_t child_pid;
 
@@ -219,6 +203,28 @@ static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
         pid_array_destroy();
         */
         exit(EXIT_SUCCESS);
+}
+
+static FILE *pidof_popen(const char *const process_name)
+{
+        /*
+         *ASSUMPTION: the length of a line is no more than 1023 characters
+         */
+        const char *const pidof_filter = "pidof -x ";
+        const char *const tr_filter = " | tr \' \' \'\n\'";
+        size_t cat_str_size =
+                strlen(pidof_filter) +
+                strlen(process_name) +
+                strlen(tr_filter)    + 1;
+        char *cmd_buffer = calloc_or_die(1, cat_str_size);
+
+        snprintf(cmd_buffer, cat_str_size, "%s%s%s",
+                 pidof_filter,
+                 process_name,
+                 tr_filter);
+        zerofree(cmd_buffer);
+
+        return popen_or_die(cmd_buffer, "r");
 }
 
 /*
