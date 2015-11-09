@@ -33,3 +33,6 @@ TA Name:             Luke Nitish Kumar
   there is a line "coredumpctl 10" appear in the configuration file at the same
   time; however, "re-definition" is allowed if the file is re-read (caught a
   SIGHUP signal).
+
+4.The length of the program name to be monitored is no longer than 1024
+  characters as well(based on ASSUMPTION #1).

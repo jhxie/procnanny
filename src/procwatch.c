@@ -39,28 +39,24 @@ void procwatch(const char *const cfgname)
         /*
          *This array is used to store the watched pid pairs
          */
+
+        /*
         pid_pair_array_size = 256;
         pid_pair_array = calloc_or_die(pid_pair_array_size,
                                        sizeof(struct pw_watched_pid_info));
+        */
         char linebuf[PW_LINEBUF_SIZE] = {};
         FILE *pwlog = pwlog_setup();
-        FILE *nanny_cfg = fopen_or_die(cfgname, "r");
         struct pw_log_info loginfo = {};
         int child_return_status;
+        config_parse(cfgname);
 
-        while (NULL != fgets(linebuf, PW_LINEBUF_SIZE, nanny_cfg)) {
-                /*fgets() leaves the newline character untouched, so kill it*/
-                linebuf[strlen(linebuf) - 1] = '\0';
-                config_parse(&loginfo, linebuf);
+        for (struct pw_cfg_info *cfg_iterator = pw_cfg_vector;
+             cfg_iterator->process_name[0] != '\0';
+             ++cfg_iterator) {
+                loginfo.process_name = cfg_iterator->process_name;
+                loginfo.wait_threshold = cfg_iterator->wait_threshold;
                 work_dispatch(pwlog, &loginfo);
-        }
-
-        /*Check whether the NULL returned by fgets() is caused by EOF*/
-        if (feof(nanny_cfg)) {
-                fclose_or_die(nanny_cfg);
-        } else {
-                perror("fgets()");
-                exit(EXIT_FAILURE);
         }
 
         /*
@@ -68,6 +64,7 @@ void procwatch(const char *const cfgname)
          *worker processes, wait for them to finish so they would
          *not become zombies.
          */
+        /*
         errno = 0;
         loginfo.num_term = 0;
         for (size_t i = 0; i < pid_pair_array_index; ++i) {
@@ -88,6 +85,7 @@ void procwatch(const char *const cfgname)
         pwlog_write(pwlog, &loginfo);
         fclose_or_die(pwlog);
         zerofree(pid_pair_array);
+        */
 }
 
 static void procclean(void)
@@ -164,10 +162,12 @@ static void work_dispatch(FILE *pwlog, struct pw_log_info *const loginfo)
                         loginfo->log_type = INFO_INIT;
                         loginfo->watched_pid = (pid_t)watched_pid;
                         pwlog_write(pwlog, loginfo);
+                        /*
                         pid_array_update(child_pid,
                                          watched_pid,
                                          loginfo->process_name,
                                          loginfo->wait_threshold);
+                        */
                         break;
                 }
         }
@@ -207,15 +207,21 @@ static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
                          *If the watched process no longer exist,
                          *the monitor action is considered "failed".
                          */
+
+                        /*
                         pid_array_destroy();
+                        */
                         exit(EXIT_FAILURE);
                         break;
                 }
         }
+        /*
         pid_array_destroy();
+        */
         exit(EXIT_SUCCESS);
 }
 
+/*
 static void pid_array_update(pid_t child_pid,
                              pid_t watched_pid,
                              const char *process_name,
@@ -243,3 +249,4 @@ static void pid_array_destroy(void)
         }
         zerofree(pid_pair_array);
 }
+*/

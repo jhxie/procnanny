@@ -1,3 +1,9 @@
+/*
+ *Note this module contains a file scope variable pw_cfg_vector with EXTERNAL
+ *LINKAGE, which is used to store the configuration file information;
+ *normally the information within the vector should ONLY BE INSPECTED rather
+ *than MODIFIED.
+ */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -20,18 +26,60 @@
 
 #include "memwatch.h"
 
-static const char *const CFG_WHITESPACE = "\t ";
-static const int WAIT_THRESHOLD_BASE = 10;
+/*
+ *According to the specification, "You can safely assume that the input file
+ *will contain no more than 128 program names"; I also make the assumption that
+ *there is no redundant entries in the configuraiton file
+ *(detailed in #3 ASSUMPTION in README.md).
+ */
+struct pw_cfg_info pw_cfg_vector[PW_CFG_MAX_NUM_PROGRAM_NAME];
 
-void config_parse(struct pw_log_info *const pwlog, char *const cfgline)
+static size_t pw_cfg_idx                = 0;
+static const char *const CFG_WHITESPACE = "\t ";
+static const int WAIT_THRESHOLD_BASE    = 10;
+
+void config_parse(const char *const cfgname)
 {
+        if (PW_CFG_MAX_NUM_PROGRAM_NAME == pw_cfg_idx) {
+                eprintf("The 128 program name assumption in the specification"
+                        " is violated, terminate the program.");
+                exit(EXIT_FAILURE);
+        }
+
         /*
          *Note here the saveptr is used for strtok_r to recover the context
          *left off by the first call; which occurred in config_parse_pname().
          */
         char *saveptr = NULL;
-        pwlog->process_name = config_parse_pname(cfgline, &saveptr);
-        pwlog->wait_threshold = config_parse_threshold(cfgline, saveptr);
+        char linebuf[PW_LINEBUF_SIZE] = {};
+        /*for extra safety*/
+        memset(linebuf, 0, PW_LINEBUF_SIZE);
+        FILE *nanny_cfg = fopen_or_die(cfgname, "r");
+
+        while (NULL != fgets(linebuf, PW_LINEBUF_SIZE, nanny_cfg)) {
+                /*fgets() leaves the newline character untouched, so strip it*/
+                linebuf[strlen(linebuf) - 1] = '\0';
+                /*
+                 *it is safe to use strcpy here since the length of a token
+                 *within a string MUST be less than or equal to the string
+                 *itself
+                 */
+                strcpy(pw_cfg_vector[pw_cfg_idx].process_name,
+                        config_parse_pname(linebuf, &saveptr));
+
+                pw_cfg_vector[pw_cfg_idx].wait_threshold =
+                        config_parse_threshold(linebuf, saveptr);
+                saveptr = NULL;
+                pw_cfg_idx++;
+        }
+
+        /*Check whether the NULL returned by fgets() is caused by EOF*/
+        if (feof(nanny_cfg)) {
+                fclose_or_die(nanny_cfg);
+        } else {
+                perror("fgets()");
+                exit(EXIT_FAILURE);
+        }
 }
 
 static unsigned config_parse_threshold(char *const cfgline, char *saveptr)

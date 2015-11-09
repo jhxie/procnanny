@@ -7,8 +7,9 @@
 struct pw_watched_pid_info {
     pid_t child_pid;
     pid_t watched_pid;
-    char *process_name;
-    unsigned wait_threshold;
+    unsigned cwait_threshold;
+    unsigned pwait_threshold;
+    int ipc_fdes[2];
 };
 
 void procwatch(const char *const cfgname);

@@ -7,7 +7,7 @@
 
 #define eprintf(...) fprintf(stderr, __VA_ARGS__)
 /*
- *cfree(clean free)
+ *zerofree
  *set the pointer to NULL after free
  */
 #define zerofree(ptr) \
