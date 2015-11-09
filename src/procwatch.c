@@ -56,9 +56,7 @@ void procwatch(const char *const cfgname)
         size_t numcfgline = config_parse(cfgname);
 
         for (size_t i = 0; i < numcfgline; ++i) {
-                loginfo.process_name   = pw_cfg_vector[i].process_name;
-                loginfo.wait_threshold = pw_cfg_vector[i].wait_threshold;
-                work_dispatch(pwlog, &loginfo);
+                work_dispatch(pwlog, &pw_cfg_vector[i]);
         }
 
         /*
@@ -117,12 +115,16 @@ static void procclean(void)
         pclose_or_die(clean_pipe);
 }
 
-static void work_dispatch(FILE *pwlog, struct pw_log_info *const loginfo)
+static void work_dispatch(FILE *pwlog, const struct pw_cfg_info *const cfginfo)
 {
         bool process_not_found = true;
         char linebuf[PW_LINEBUF_SIZE] = {};
         char *endptr = NULL;
-        FILE *pidof_pipe = pidof_popen(loginfo->process_name);
+        FILE *pidof_pipe = pidof_popenr(cfginfo->process_name);
+        struct pw_log_info loginfo = {
+                .wait_threshold = cfginfo->wait_threshold,
+                .process_name = cfginfo->process_name
+        };
         uintmax_t watched_pid = 0;
         pid_t child_pid;
 
@@ -135,15 +137,15 @@ static void work_dispatch(FILE *pwlog, struct pw_log_info *const loginfo)
                 case 0:
                         pclose(pidof_pipe);
                         fclose_or_die(pwlog);
-                        process_monitor(loginfo->wait_threshold,
+                        process_monitor(loginfo.wait_threshold,
                                         (pid_t)watched_pid);
                         /*NEVER REACHED AGAIN*/
                         break;
                 default:
                         /*Parent write INFO_INIT log*/
-                        loginfo->log_type = INFO_INIT;
-                        loginfo->watched_pid = (pid_t)watched_pid;
-                        pwlog_write(pwlog, loginfo);
+                        loginfo.log_type = INFO_INIT;
+                        loginfo.watched_pid = (pid_t)watched_pid;
+                        pwlog_write(pwlog, &loginfo);
                         /*
                         pid_array_update(child_pid,
                                          watched_pid,
@@ -155,8 +157,8 @@ static void work_dispatch(FILE *pwlog, struct pw_log_info *const loginfo)
         }
         if (true == process_not_found) {
                 /*Parent write INFO_NOEXIST log*/
-                loginfo->log_type = INFO_NOEXIST;
-                pwlog_write(pwlog, loginfo);
+                loginfo.log_type = INFO_NOEXIST;
+                pwlog_write(pwlog, &loginfo);
         }
         pclose_or_die(pidof_pipe);
 }
@@ -203,7 +205,7 @@ static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
         exit(EXIT_SUCCESS);
 }
 
-static FILE *pidof_popen(const char *const process_name)
+static FILE *pidof_popenr(const char *const process_name)
 {
         /*
          *ASSUMPTION: the length of a line is no more than 1023 characters

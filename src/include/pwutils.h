@@ -4,8 +4,9 @@
 #include <stdio.h>
 
 static void procclean(void);
-static void work_dispatch(FILE *pwlog, struct pw_log_info *const loginfo);
-static FILE *pidof_popen(const char *const process_name);
+static void work_dispatch(FILE *pwlog, const struct pw_cfg_info *const cfginfo);
+static FILE *pidof_popenr(const char *const process_name)
+        __attribute__((warn_unused_result));
 static void process_monitor(unsigned wait_threshold, pid_t watched_process_id)
                 __attribute__((noreturn));
 /*

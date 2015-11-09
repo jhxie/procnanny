@@ -5,6 +5,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+/*
+ *based on the variadic macro expansion example from
+ *https://gcc.gnu.org/onlinedocs/cpp/Variadic-Macros.html
+ */
 #define eprintf(...) fprintf(stderr, __VA_ARGS__)
 /*
  *zerofree
