@@ -191,6 +191,7 @@ int bst_destroy(struct bst **current_bst)
                 }
                 tmp_ptr = saveptr;
         }
+        free(*current_bst);
         *current_bst = NULL;
         return 0;
 }
