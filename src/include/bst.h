@@ -25,12 +25,8 @@ void *bst_add(struct bst *current_bst, long key, size_t blknum, size_t blksize)
         __attribute__((warn_unused_result));
 long bst_rootkey(struct bst *current_bst);
 int bst_del(struct bst *current_bst, long key);
-void *bst_first(struct bst_trav *trav, struct bst *current_bst)
-        __attribute__((warn_unused_result));
-void *bst_next(struct bst_trav *trav)
-        __attribute__((warn_unused_result));
 int bst_destroy(struct bst **current_bst);
-void pw_pid_bst_add_interval(struct bst *current_bst, unsigned interval);
+int pw_pid_bst_add_interval(struct bst *current_bst, unsigned ival);
 
 static inline bool bst_isempty(struct bst *current_bst)
         __attribute__((always_inline));

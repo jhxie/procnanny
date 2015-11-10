@@ -26,6 +26,7 @@
 #include "memwatch.h"
 
 enum bst_link_dir { BST_LEFT, BST_RIGHT, BST_LINKSIZE };
+static unsigned interval = 0;
 
 struct bst_node_ {
         long key;
@@ -36,7 +37,6 @@ struct bst_node_ {
          */
         size_t blknum;  /* number of blocks */
         size_t blksize; /* size of each block */
-        struct bst_node_ *up; /* parent pointer */
         struct bst_node_ *link[BST_LINKSIZE]; /* child pointer */
 };
 
@@ -101,7 +101,6 @@ void *bst_add(struct bst *current_bst, long key, size_t blknum, size_t blksize)
         bstnode->blknum                     = blknum;
         bstnode->blksize                    = blksize;
         /*again, redundant*/
-        bstnode->up              = NULL;
         bstnode->link[BST_LEFT]  = NULL;
         bstnode->link[BST_RIGHT] = NULL;
         
@@ -129,7 +128,6 @@ void *bst_add(struct bst *current_bst, long key, size_t blknum, size_t blksize)
                         tmp_ptr = tmp_ptr->link[dir];
                 }
                 tmp_ptr->link[dir] = bstnode;
-                tmp_ptr->link[dir]->up = tmp_ptr;
         }
 
         current_bst->numnode++;
@@ -153,16 +151,16 @@ int bst_del(struct bst *current_bst, long key)
         }
 
         if (NULL != current_bst->root) {
-                struct bst_node_ head     = {};
-                struct bst_node_ *tmp_ptr = &head;
-                struct bst_node_ *f_ptr   = NULL;
-                enum bst_link_dir dir     = BST_RIGHT;
+                struct bst_node_ head                   = {};
+                struct bst_node_ *tmp_ptr               = &head;
+                struct bst_node_ *p_ptr, *f_ptr = NULL;
+                enum bst_link_dir dir                   = BST_RIGHT;
 
                 /*make the new node's right chain pointer point to the root*/
                 tmp_ptr->link[BST_RIGHT] = current_bst->root;
-                current_bst->root->up = &head;
 
                 while (NULL != tmp_ptr->link[dir]) {
+                        p_ptr = tmp_ptr;
                         tmp_ptr = tmp_ptr->link[dir];
                         dir = key >= tmp_ptr->key;
 
@@ -172,84 +170,19 @@ int bst_del(struct bst *current_bst, long key)
                 }
 
                 if (NULL != f_ptr) {
-                        enum bst_link_dir dir = tmp_ptr->link[BST_LEFT] == NULL;
-                        
                         f_ptr->key = tmp_ptr->key;
                         f_ptr->blknum = tmp_ptr->blknum;
                         f_ptr->blksize = tmp_ptr->blksize;
                         free(f_ptr->memblk);
                         f_ptr->memblk = tmp_ptr->memblk;
-
-                        tmp_ptr->up->link
-                                [tmp_ptr->up->link[BST_RIGHT] == tmp_ptr] =
-                                tmp_ptr->link[dir];
-                        if (NULL != tmp_ptr->link[dir]) {
-                                tmp_ptr->link[dir]->up = tmp_ptr->up;
-                        }
-
+                        p_ptr->link[tmp_ptr == p_ptr->link[BST_RIGHT]] =
+                                tmp_ptr->link[NULL == tmp_ptr->link[BST_LEFT]];
                         free(tmp_ptr);
                         current_bst->numnode--;
                 }
                 current_bst->root = head.link[BST_RIGHT];
-
-                if (NULL != current_bst->root) {
-                        current_bst->root->up = NULL;
-                }
         }
         return 0;
-}
-
-void *bst_first(struct bst_trav *trav, struct bst *current_bst)
-{
-        if (NULL == trav || NULL == current_bst) {
-                errno = EINVAL;
-                return NULL;
-        }
-
-        trav->tmp_ptr = current_bst->root;
-
-        if (NULL != trav->tmp_ptr) {
-                while (NULL != trav->tmp_ptr->link[BST_LEFT]) {
-                        trav->tmp_ptr = trav->tmp_ptr->link[BST_LEFT];
-                }
-        }
-
-        if (NULL != trav->tmp_ptr) {
-                return &trav->tmp_ptr->memblk;
-        } else {
-                return NULL;
-        }
-}
-
-void *bst_next(struct bst_trav *trav)
-{
-        if (NULL == trav) {
-                errno = EINVAL;
-                return NULL;
-        }
-
-        if (NULL != trav->tmp_ptr->link[BST_RIGHT]) {
-                trav->tmp_ptr = trav->tmp_ptr->link[BST_RIGHT];
-
-                while (NULL != trav->tmp_ptr->link[BST_LEFT]) {
-                        trav->tmp_ptr = trav->tmp_ptr->link[BST_LEFT];
-                }
-        } else {
-                while (true) {
-                        if (NULL == trav->tmp_ptr->up ||
-                            trav->tmp_ptr == trav->tmp_ptr->up->link[BST_LEFT]){
-                                trav->tmp_ptr = trav->tmp_ptr->up;
-                                break;
-                        }
-                        trav->tmp_ptr = trav->tmp_ptr->up;
-                }
-        }
-
-        if (NULL != trav->tmp_ptr) {
-                return &trav->tmp_ptr->memblk;
-        } else {
-                return NULL;
-        }
 }
 
 int bst_destroy(struct bst **current_bst)
@@ -279,16 +212,12 @@ int bst_destroy(struct bst **current_bst)
         return 0;
 }
 
-void pw_pid_bst_add_interval(struct bst *current_bst, unsigned interval)
+static void pw_pid_bst_inorder_add(struct bst_node_ *root)
 {
-        struct bst_trav trav;
-        struct pw_pid_info *tmp_ptr = bst_first(&trav, current_bst);
+        if (NULL != root) {
+                pw_pid_bst_inorder_add(root->link[BST_LEFT]);
 
-        while (NULL != tmp_ptr) {
-                /*
-                 *if a furthur increment would result in overflow, set
-                 *the parent wait threshold to UINT_MAX
-                 */
+                struct pw_pid_info *tmp_ptr = root->memblk;
                 if ((unsigned long)tmp_ptr->pwait_threshold +
                     (unsigned long)interval >=
                     (unsigned long)UINT_MAX) {
@@ -296,6 +225,19 @@ void pw_pid_bst_add_interval(struct bst *current_bst, unsigned interval)
                 } else {
                         tmp_ptr->pwait_threshold += interval;
                 }
-                tmp_ptr = bst_next(&trav);
+                pw_pid_bst_inorder_add(root->link[BST_RIGHT]);
         }
 }
+
+int pw_pid_bst_add_interval(struct bst *current_bst, unsigned ival)
+{
+        if (NULL == current_bst) {
+                errno = EINVAL;
+                return -1;
+        }
+        interval = ival;
+        pw_pid_bst_inorder_add(current_bst->root);
+
+        return 0;
+}
+
