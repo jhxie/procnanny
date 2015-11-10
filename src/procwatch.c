@@ -141,7 +141,6 @@ static void work_dispatch(const struct pw_cfg_info *const cfginfo)
 {
         bool process_not_found = true;
         char linebuf[PW_LINEBUF_SIZE] = {};
-        char writebuf[PW_CHILD_READ_SIZE] = {};
         char *endptr = NULL;
         FILE *pidof_pipe = pidof_popenr(cfginfo->process_name);
         struct pw_pid_info wpid_info = {
@@ -150,14 +149,12 @@ static void work_dispatch(const struct pw_cfg_info *const cfginfo)
                 .cwait_threshold = cfginfo->wait_threshold,
                 .pwait_threshold = 0,
         };
-        struct pw_pid_info *wpid_info_ptr;
         struct pw_idle_info *idle_info_ptr;
         strcpy(wpid_info.process_name, cfginfo->process_name);
 
         while (NULL != fgets(linebuf, sizeof linebuf, pidof_pipe)) {
                 process_not_found = false;
                 wpid_info.watched_pid = (pid_t)strtoumax(linebuf, &endptr, 10);
-
                 /*
                  *not possible for wpid_bst to be NULL here
                  *so errno is un-checked;
@@ -166,7 +163,6 @@ static void work_dispatch(const struct pw_cfg_info *const cfginfo)
                  */
                 if (NULL != bst_find(pw_pid_bst, wpid_info.watched_pid))
                         continue;
-
                 /*use exsiting children if there are idle ones*/
                 if (false == bst_isempty(pw_idle_bst)) {
                         idle_info_ptr =
@@ -175,39 +171,13 @@ static void work_dispatch(const struct pw_cfg_info *const cfginfo)
                         wpid_info.ipc_fdes[0] = idle_info_ptr->ipc_fdes[0];
                         wpid_info.ipc_fdes[1] = idle_info_ptr->ipc_fdes[1];
                         bst_del(pw_idle_bst, bst_rootkey(pw_idle_bst));
+                } else {
+                        child_create(pidof_pipe, &wpid_info);
                 }
-
                 /*Parent write INFO_INIT log*/
                 wpid_info.type = INFO_INIT;
                 pwlog_write(pwlog, &wpid_info);
-
-                *((pid_t *)writebuf)                     =
-                        wpid_info.watched_pid;
-                *((unsigned *)(((pid_t *)writebuf) + 1)) =
-                        wpid_info.cwait_threshold;
-                write_or_die(wpid_info.ipc_fdes[1],
-                             writebuf,
-                             PW_CHILD_READ_SIZE);
-
-                errno = 0;
-                wpid_info_ptr = bst_add(pw_pid_bst,
-                                  wpid_info.watched_pid,
-                                  1,
-                                  sizeof(struct pw_pid_info));
-                /*
-                 *note that duplicate keys are not possible because
-                 *it is checked previously; so the only case the
-                 *bst_add() can fail is SIZE_MAX is about to be reached
-                 *(impossible for wpid_bst to be NULL)
-                 */
-                if (NULL != wpid_info_ptr) {
-                        *wpid_info_ptr = wpid_info;
-                } else if (EOVERFLOW == errno || EINVAL == errno) {
-                                errx(EXIT_FAILURE, "bst : error");
-                }
-                /*
-                 *the watched_pid has already been monitored, do nothing
-                 */
+                parent_msg_write(&wpid_info);
         }
         if (true == process_not_found) {
                 /*Parent write INFO_NOEXIST log*/
@@ -215,6 +185,40 @@ static void work_dispatch(const struct pw_cfg_info *const cfginfo)
                 pwlog_write(pwlog, &wpid_info);
         }
         pclose_or_die(pidof_pipe);
+}
+
+static void parent_msg_write(struct pw_pid_info *const wpid_info)
+{
+        char writebuf[PW_CHILD_READ_SIZE] = {};
+        struct pw_pid_info *wpid_info_ptr;
+
+        *((pid_t *)writebuf)                     =
+                wpid_info->watched_pid;
+        *((unsigned *)(((pid_t *)writebuf) + 1)) =
+                wpid_info->cwait_threshold;
+        write_or_die(wpid_info->ipc_fdes[1],
+                     writebuf,
+                     PW_CHILD_READ_SIZE);
+
+        errno = 0;
+        wpid_info_ptr = bst_add(pw_pid_bst,
+                          wpid_info->watched_pid,
+                          1,
+                          sizeof(struct pw_pid_info));
+        /*
+         *note that duplicate keys are not possible because
+         *it is checked previously; so the only case the
+         *bst_add() can fail is SIZE_MAX is about to be reached
+         *(impossible for wpid_bst to be NULL)
+         */
+        if (NULL != wpid_info_ptr) {
+                *wpid_info_ptr = *wpid_info;
+        } else if (EOVERFLOW == errno || EINVAL == errno) {
+                        errx(EXIT_FAILURE, "bst : error");
+        }
+        /*
+         *the watched_pid has already been monitored, do nothing
+         */
 }
 
 /*
