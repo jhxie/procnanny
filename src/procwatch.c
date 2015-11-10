@@ -47,14 +47,13 @@ void procwatch(const char *const cfgname)
 
         pw_pid_bst = bst_init();
         pw_idle_bst = bst_init();
+        bool have_idle = false;
         char linebuf[PW_LINEBUF_SIZE] = {};
         pwlog = pwlog_setup();
-        int child_return_status;
         size_t numcfgline = config_parse(cfgname);
         struct bst_trav trav;
         struct pw_pid_info *pid_info_ptr;
         struct pw_idle_info *idle_info_ptr;
-        pid_t saved_monitored_id;
 
         while (true) {
                 for (size_t i = 0; i < numcfgline; ++i) {
@@ -71,18 +70,19 @@ void procwatch(const char *const cfgname)
                                             2);
                                 /*failed to kill the specified process*/
                                 if (0 == strcmp(linebuf, "0")) {
-                                        pid_info_ptr->type = INFO_NOEXIST;
+                                        have_idle = true;
                                 /*successfully killed the process*/
                                 } else if (0 == strcmp(linebuf, "1")) {
+                                        have_idle = true;
                                         pid_info_ptr->type = ACTION_KILL;
+                                        pwlog_write(pwlog, pid_info_ptr);
                                         num_killed++;
                                 /*invalid pipe message, child quits*/
                                 } else if (0 == strcmp(linebuf, "2")) {
                                 }
 
-                                if (INFO_NOEXIST == pid_info_ptr->type ||
-                                    ACTION_KILL == pid_info_ptr->type) {
-                                        pwlog_write(pwlog, pid_info_ptr);
+                                if (true == have_idle) {
+                                        have_idle = false;
                                         idle_info_ptr =
                                                 bst_add(pw_idle_bst,
                                                 pid_info_ptr->child_pid,
@@ -104,6 +104,7 @@ void procwatch(const char *const cfgname)
                 for (size_t i = 0; i < delele_ready_idx; ++i) {
                         bst_del(pw_pid_bst, delele_ready_pids[i]);
                 }
+                delele_ready_idx = 0;
         }
 
         /*
