@@ -13,7 +13,7 @@
  *(that is also the reason PW_LINEBUF_SIZE is declared as
  *a enumerator)
  */
-#define CHILD_READ_SIZE ((ssize_t)(sizeof(pid_t) + sizeof(unsigned)))
+#define PW_CHILD_READ_SIZE ((ssize_t)(sizeof(pid_t) + sizeof(unsigned)))
 
 struct pw_pid_info {
     enum { INFO_INIT, INFO_NOEXIST, INFO_REPORT, ACTION_KILL } type;

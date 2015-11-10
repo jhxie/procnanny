@@ -138,6 +138,7 @@ static void work_dispatch(FILE *pwlog, const struct pw_cfg_info *const cfginfo)
 {
         bool process_not_found = true;
         char linebuf[PW_LINEBUF_SIZE] = {};
+        char writebuf[PW_CHILD_READ_SIZE] = {};
         char *endptr = NULL;
         FILE *pidof_pipe = pidof_popenr(cfginfo->process_name);
         struct pw_pid_info wpid_info = {
@@ -180,11 +181,18 @@ static void work_dispatch(FILE *pwlog, const struct pw_cfg_info *const cfginfo)
                 default:
                         /*Parent write INFO_INIT log*/
                         wpid_info.type = INFO_INIT;
-                        wpid_info.watched_pid = (pid_t)wpid_info.watched_pid;
                         pwlog_write(pwlog, &wpid_info);
 
                         WORK_DISPATCH_PARENT_CLEANUP();
-                        /*write_or_die(wpid_info.ipc_fdes[1],*/
+
+                        *((pid_t *)writebuf)                     =
+                                wpid_info.watched_pid;
+                        *((unsigned *)(((pid_t *)writebuf) + 1)) =
+                                wpid_info.cwait_threshold;
+                        write_or_die(wpid_info.ipc_fdes[1],
+                                     writebuf,
+                                     PW_CHILD_READ_SIZE);
+
                         errno = 0;
                         tmp_ptr = bst_add(pw_pid_bst,
                                           wpid_info.watched_pid,
@@ -226,12 +234,12 @@ static void process_monitor(int readdes, int writedes)
         sigfillset_or_die(&block_mask);
         sigprocmask_or_die(SIG_SETMASK, &block_mask, NULL);
         const char *READ_PIPE_FAIL_MSG       = "child: invalid message size\n";
-        char        readbuf[CHILD_READ_SIZE] = {};
+        char        readbuf[PW_CHILD_READ_SIZE] = {};
         pid_t       watched_pid              = 0;
         pid_t      *watched_pid_ptr          = NULL;
         unsigned    wait_threshold           = 0;
         unsigned   *wait_threshold_ptr       = NULL;
-        memset(readbuf, 0, CHILD_READ_SIZE);
+        memset(readbuf, 0, PW_CHILD_READ_SIZE);
         /*
          *Even though the checking is performed on errno after the
          *process is killed, we still have a potential problem
@@ -245,7 +253,8 @@ static void process_monitor(int readdes, int writedes)
                  *the parent to give information about the next process
                  *to monitor
                  */
-                if (CHILD_READ_SIZE != read(readdes, readbuf, CHILD_READ_SIZE)){
+                if (PW_CHILD_READ_SIZE !=
+                    read(readdes, readbuf, PW_CHILD_READ_SIZE)){
                         /*
                          *Posix 1 guarantees that a read of size less than
                          *PIPE_BUF is atomic, here since CHILD_READ_SIZE is
