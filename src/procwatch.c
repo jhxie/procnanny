@@ -28,14 +28,16 @@
 
 #include "memwatch.h"
 
-size_t num_killed                         = 0;
+size_t num_killed                               = 0;
 /*pw_pid_bst is used for storing struct pw_pid_info*/
-static struct bst *pw_pid_bst             = NULL;
+static struct bst *pw_pid_bst                   = NULL;
 /*pw_idle_bst is used for storing the info of idle children*/
-static struct bst *pw_idle_bst            = NULL;
-static FILE *pwlog                        = NULL;
-static volatile sig_atomic_t sig_hup_flag = false;
-static volatile sig_atomic_t sig_int_flag = false;
+static struct bst *pw_idle_bst                  = NULL;
+static FILE *pwlog                              = NULL;
+static pid_t delele_ready_pids[PW_LINEBUF_SIZE] = {};
+static size_t delele_ready_idx                  = 0;
+static volatile sig_atomic_t sig_hup_flag       = false;
+static volatile sig_atomic_t sig_int_flag       = false;
 
 void procwatch(const char *const cfgname)
 {
@@ -49,12 +51,59 @@ void procwatch(const char *const cfgname)
         pwlog = pwlog_setup();
         int child_return_status;
         size_t numcfgline = config_parse(cfgname);
+        struct bst_trav trav;
+        struct pw_pid_info *pid_info_ptr;
+        struct pw_idle_info *idle_info_ptr;
+        pid_t saved_monitored_id;
 
         while (true) {
                 for (size_t i = 0; i < numcfgline; ++i) {
                         work_dispatch(&pw_cfg_vector[i]);
                 }
                 sleep(5U);
+                pw_pid_bst_add_interval(pw_pid_bst, 5U);
+                pid_info_ptr = bst_first(&trav, pw_pid_bst);
+                while (NULL != pid_info_ptr) {
+                        if (pid_info_ptr->pwait_threshold >=
+                            pid_info_ptr->cwait_threshold) {
+                                read_or_die(pid_info_ptr->ipc_fdes[0],
+                                            linebuf,
+                                            2);
+                                /*failed to kill the specified process*/
+                                if (0 == strcmp(linebuf, "0")) {
+                                        pid_info_ptr->type = INFO_NOEXIST;
+                                /*successfully killed the process*/
+                                } else if (0 == strcmp(linebuf, "1")) {
+                                        pid_info_ptr->type = ACTION_KILL;
+                                        num_killed++;
+                                /*invalid pipe message, child quits*/
+                                } else if (0 == strcmp(linebuf, "2")) {
+                                }
+
+                                if (INFO_NOEXIST == pid_info_ptr->type ||
+                                    ACTION_KILL == pid_info_ptr->type) {
+                                        pwlog_write(pwlog, pid_info_ptr);
+                                        idle_info_ptr =
+                                                bst_add(pw_idle_bst,
+                                                pid_info_ptr->child_pid,
+                                                1,
+                                                sizeof(struct pw_idle_info));
+                                        idle_info_ptr->child_pid =
+                                                pid_info_ptr->child_pid;
+                                        idle_info_ptr->ipc_fdes[0] =
+                                                pid_info_ptr->ipc_fdes[0];
+                                        idle_info_ptr->ipc_fdes[1] =
+                                                pid_info_ptr->ipc_fdes[1];
+                                }
+                                delele_ready_pids[delele_ready_idx] =
+                                        pid_info_ptr->watched_pid;
+                                delele_ready_idx++;
+                        }
+                        pid_info_ptr = bst_next(&trav);
+                }
+                for (size_t i = 0; i < delele_ready_idx; ++i) {
+                        bst_del(pw_pid_bst, delele_ready_pids[i]);
+                }
         }
 
         /*
