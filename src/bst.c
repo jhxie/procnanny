@@ -83,7 +83,6 @@ void *bst_add(struct bst *current_bst, long key, size_t blknum, size_t blksize)
 
         struct bst_node_ *bstnode = calloc_or_die(1, sizeof(struct bst_node_));
 
-        current_bst->numnode++;
         if (current_bst->numnode + 1 == SIZE_MAX) {
 #ifdef BST_DEBUG
                 const char *const err_msg = "bst: max node count reached\n";
@@ -125,6 +124,7 @@ void *bst_add(struct bst *current_bst, long key, size_t blknum, size_t blksize)
                 tmp_ptr->link[dir] = bstnode;
         }
 
+        current_bst->numnode++;
         return bstnode->memblk;
 }
 
@@ -163,6 +163,7 @@ int bst_del(struct bst *current_bst, long key)
                         p_ptr->link[tmp_ptr == p_ptr->link[BST_RIGHT]] =
                                 tmp_ptr->link[NULL == tmp_ptr->link[BST_LEFT]];
                         free(tmp_ptr);
+                        current_bst->numnode--;
                 }
                 current_bst->root = head.link[BST_RIGHT];
         }
