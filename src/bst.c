@@ -9,6 +9,7 @@
 #endif
 
 #include <errno.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h> /*MAX_SIZE definition*/
@@ -19,6 +20,7 @@
 #endif
 
 #include "bst.h"
+#include "procwatch.h"
 #include "pwwrapper.h"
 
 #include "memwatch.h"
@@ -32,9 +34,10 @@ struct bst_node_ {
          *Unlike the implementation of castack, here I use 2 separate fields
          *to store the size of the memory block.
          */
-        size_t blknum;  /* number of blocks */ 
-        size_t blksize; /* size of each block */ 
-        struct bst_node_ *link[BST_LINKSIZE];
+        size_t blknum;  /* number of blocks */
+        size_t blksize; /* size of each block */
+        struct bst_node_ *up; /* parent pointer */
+        struct bst_node_ *link[BST_LINKSIZE]; /* child pointer */
 };
 
 struct bst *bst_init(void)
@@ -88,6 +91,7 @@ void *bst_add(struct bst *current_bst, long key, size_t blknum, size_t blksize)
                 const char *const err_msg = "bst: max node count reached\n";
                 write(STDERR_FILENO, err_msg, strlen(err_msg));
 #endif
+                free(bstnode);
                 errno = EOVERFLOW;
                 return NULL;
         }
@@ -97,6 +101,7 @@ void *bst_add(struct bst *current_bst, long key, size_t blknum, size_t blksize)
         bstnode->blknum                     = blknum;
         bstnode->blksize                    = blksize;
         /*again, redundant*/
+        bstnode->up              = NULL;
         bstnode->link[BST_LEFT]  = NULL;
         bstnode->link[BST_RIGHT] = NULL;
         
@@ -111,8 +116,10 @@ void *bst_add(struct bst *current_bst, long key, size_t blknum, size_t blksize)
 
                 while (true) {
                         /*note that duplicate keys are NOT allowed*/
-                        if (bstnode->key == tmp_ptr->key)
+                        if (bstnode->key == tmp_ptr->key) {
+                                free(bstnode);
                                 return NULL;
+                        }
 
                         dir = bstnode->key > tmp_ptr->key;
 
@@ -122,6 +129,7 @@ void *bst_add(struct bst *current_bst, long key, size_t blknum, size_t blksize)
                         tmp_ptr = tmp_ptr->link[dir];
                 }
                 tmp_ptr->link[dir] = bstnode;
+                tmp_ptr->link[dir]->up = tmp_ptr;
         }
 
         current_bst->numnode++;
@@ -145,16 +153,16 @@ int bst_del(struct bst *current_bst, long key)
         }
 
         if (NULL != current_bst->root) {
-                struct bst_node_ head                   = {};
-                struct bst_node_ *tmp_ptr               = &head;
-                struct bst_node_ *p_ptr, *f_ptr = NULL;
-                enum bst_link_dir dir                   = BST_RIGHT;
+                struct bst_node_ head     = {};
+                struct bst_node_ *tmp_ptr = &head;
+                struct bst_node_ *f_ptr   = NULL;
+                enum bst_link_dir dir     = BST_RIGHT;
 
                 /*make the new node's right chain pointer point to the root*/
                 tmp_ptr->link[BST_RIGHT] = current_bst->root;
+                current_bst->root->up = &head;
 
                 while (NULL != tmp_ptr->link[dir]) {
-                        p_ptr = tmp_ptr;
                         tmp_ptr = tmp_ptr->link[dir];
                         dir = key >= tmp_ptr->key;
 
@@ -164,19 +172,84 @@ int bst_del(struct bst *current_bst, long key)
                 }
 
                 if (NULL != f_ptr) {
+                        enum bst_link_dir dir = tmp_ptr->link[BST_LEFT] == NULL;
+                        
                         f_ptr->key = tmp_ptr->key;
                         f_ptr->blknum = tmp_ptr->blknum;
                         f_ptr->blksize = tmp_ptr->blksize;
                         free(f_ptr->memblk);
                         f_ptr->memblk = tmp_ptr->memblk;
-                        p_ptr->link[tmp_ptr == p_ptr->link[BST_RIGHT]] =
-                                tmp_ptr->link[NULL == tmp_ptr->link[BST_LEFT]];
+
+                        tmp_ptr->up->link
+                                [tmp_ptr->up->link[BST_RIGHT] == tmp_ptr] =
+                                tmp_ptr->link[dir];
+                        if (NULL != tmp_ptr->link[dir]) {
+                                tmp_ptr->link[dir]->up = tmp_ptr->up;
+                        }
+
                         free(tmp_ptr);
                         current_bst->numnode--;
                 }
                 current_bst->root = head.link[BST_RIGHT];
+
+                if (NULL != current_bst->root) {
+                        current_bst->root->up = NULL;
+                }
         }
         return 0;
+}
+
+void *bst_first(struct bst_trav *trav, struct bst *current_bst)
+{
+        if (NULL == trav || NULL == current_bst) {
+                errno = EINVAL;
+                return NULL;
+        }
+
+        trav->tmp_ptr = current_bst->root;
+
+        if (NULL != trav->tmp_ptr) {
+                while (NULL != trav->tmp_ptr->link[BST_LEFT]) {
+                        trav->tmp_ptr = trav->tmp_ptr->link[BST_LEFT];
+                }
+        }
+
+        if (NULL != trav->tmp_ptr) {
+                return &trav->tmp_ptr->memblk;
+        } else {
+                return NULL;
+        }
+}
+
+void *bst_next(struct bst_trav *trav)
+{
+        if (NULL == trav) {
+                errno = EINVAL;
+                return NULL;
+        }
+
+        if (NULL != trav->tmp_ptr->link[BST_RIGHT]) {
+                trav->tmp_ptr = trav->tmp_ptr->link[BST_RIGHT];
+
+                while (NULL != trav->tmp_ptr->link[BST_LEFT]) {
+                        trav->tmp_ptr = trav->tmp_ptr->link[BST_LEFT];
+                }
+        } else {
+                while (true) {
+                        if (NULL == trav->tmp_ptr->up ||
+                            trav->tmp_ptr == trav->tmp_ptr->up->link[BST_LEFT]){
+                                trav->tmp_ptr = trav->tmp_ptr->up;
+                                break;
+                        }
+                        trav->tmp_ptr = trav->tmp_ptr->up;
+                }
+        }
+
+        if (NULL != trav->tmp_ptr) {
+                return &trav->tmp_ptr->memblk;
+        } else {
+                return NULL;
+        }
 }
 
 int bst_destroy(struct bst **current_bst)
@@ -204,4 +277,25 @@ int bst_destroy(struct bst **current_bst)
         free(*current_bst);
         *current_bst = NULL;
         return 0;
+}
+
+void pw_pid_bst_add_interval(struct bst *current_bst, unsigned interval)
+{
+        struct bst_trav trav;
+        struct pw_pid_info *tmp_ptr = bst_first(&trav, current_bst);
+
+        while (NULL != tmp_ptr) {
+                /*
+                 *if a furthur increment would result in overflow, set
+                 *the parent wait threshold to UINT_MAX
+                 */
+                if ((unsigned long)tmp_ptr->pwait_threshold +
+                    (unsigned long)interval >=
+                    (unsigned long)UINT_MAX) {
+                        tmp_ptr->pwait_threshold = UINT_MAX;
+                } else {
+                        tmp_ptr->pwait_threshold += interval;
+                }
+                tmp_ptr = bst_next(&trav);
+        }
 }

@@ -47,12 +47,14 @@ void procwatch(const char *const cfgname)
         pw_idle_bst = bst_init();
         char linebuf[PW_LINEBUF_SIZE] = {};
         pwlog = pwlog_setup();
-        struct pw_log_info loginfo = {};
         int child_return_status;
         size_t numcfgline = config_parse(cfgname);
 
-        for (size_t i = 0; i < numcfgline; ++i) {
-                work_dispatch(pwlog, &pw_cfg_vector[i]);
+        while (true) {
+                for (size_t i = 0; i < numcfgline; ++i) {
+                        work_dispatch(&pw_cfg_vector[i]);
+                }
+                sleep(5U);
         }
 
         /*
@@ -113,30 +115,6 @@ static void procclean(void)
         pclose_or_die(clean_pipe);
 }
 
-              /*Communication Protocol between parent and child*/
-/*
-                           +------+--------+-------+
-                           |      | parent | child |
-                           +------+--------+-------+
-                           |pipe1 | read   | write |
-                           |pipe2 | write  | read  |
-                           +------+--------+-------+
-
-                              from Child Processes
-                +--------+------------------------------------+
-                |Content | Meaning                            |
-                +--------+------------------------------------+
-                |  "0"   | Failed to kill the specied process |
-                |  "1"   | Success                            |
-                |  "2"   | Invalid message size(quit)         |
-                +--------+------------------------------------+
-
-                              from Parent Process
-                           +------------------------+
-                           |pid_t    watched_pid    |
-                           |unsigned wait_threshold |
-                           +------------------------+
- */
 static void work_dispatch(const struct pw_cfg_info *const cfginfo)
 {
         bool process_not_found = true;
@@ -149,8 +127,8 @@ static void work_dispatch(const struct pw_cfg_info *const cfginfo)
                 .cwait_threshold = cfginfo->wait_threshold,
                 .pwait_threshold = 0,
         };
-        struct pw_idle_info *idle_info_ptr;
         strcpy(wpid_info.process_name, cfginfo->process_name);
+        struct pw_idle_info *idle_info_ptr;
 
         while (NULL != fgets(linebuf, sizeof linebuf, pidof_pipe)) {
                 process_not_found = false;
@@ -187,6 +165,30 @@ static void work_dispatch(const struct pw_cfg_info *const cfginfo)
         pclose_or_die(pidof_pipe);
 }
 
+              /*Communication Protocol between parent and child*/
+/*
+                           +------+--------+-------+
+                           |      | parent | child |
+                           +------+--------+-------+
+                           |pipe1 | read   | write |
+                           |pipe2 | write  | read  |
+                           +------+--------+-------+
+
+                              from Child Processes
+                +--------+------------------------------------+
+                |Content | Meaning                            |
+                +--------+------------------------------------+
+                |  "0"   | Failed to kill the specied process |
+                |  "1"   | Success                            |
+                |  "2"   | Invalid message size(quit)         |
+                +--------+------------------------------------+
+
+                              from Parent Process
+                           +------------------------+
+                           |pid_t    watched_pid    |
+                           |unsigned wait_threshold |
+                           +------------------------+
+ */
 static void parent_msg_write(struct pw_pid_info *const wpid_info)
 {
         char writebuf[PW_CHILD_READ_SIZE] = {};
