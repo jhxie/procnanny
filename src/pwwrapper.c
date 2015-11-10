@@ -10,6 +10,7 @@
 
 #include <err.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -156,6 +157,42 @@ void pipe_or_die(int *pipefd)
 {
         if (-1 == pipe(pipefd)) {
                 perror("pipe()");
+                exit(EXIT_FAILURE);
+        }
+}
+
+ssize_t write_or_die(int fd, const void *buf, size_t n)
+{
+        ssize_t val;
+        if (-1 == (val = write(fd, buf, n))) {
+                perror("write()");
+                exit(EXIT_FAILURE);
+        }
+        return val;
+}
+
+ssize_t read_or_die(int fd, void *buf, size_t n)
+{
+        ssize_t val;
+        if (-1 == (val = read(fd, buf, n))) {
+                perror("read()");
+                exit(EXIT_FAILURE);
+        }
+        return val;
+}
+
+void sigfillset_or_die(sigset_t *set)
+{
+        if (-1 == sigfillset(set)) {
+                perror("sigfillset()");
+                exit(EXIT_FAILURE);
+        }
+}
+
+void sigprocmask_or_die(int how, const sigset_t *set, sigset_t *oldset)
+{
+        if (-1 == sigprocmask(how, set, oldset)) {
+                perror("sigprocmask()");
                 exit(EXIT_FAILURE);
         }
 }

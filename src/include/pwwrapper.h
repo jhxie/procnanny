@@ -38,4 +38,8 @@ int open_or_die(const char *pathname, int flags);
 void close_or_die(int fd);
 int fputs_or_die(const char *string, FILE *stream);
 void pipe_or_die(int *pipefd);
+ssize_t write_or_die(int fd, const void *buf, size_t n);
+ssize_t read_or_die(int fd, void *buf, size_t n);
+void sigfillset_or_die(sigset_t *set);
+void sigprocmask_or_die(int how, const sigset_t *set, sigset_t *oldset);
 #endif

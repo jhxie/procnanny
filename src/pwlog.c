@@ -19,7 +19,7 @@ FILE *pwlog_setup(void)
         return fopen_or_die(pwlog_path, "w");
 }
 
-void pwlog_write(FILE *pwlog, struct pw_log_info *loginfo)
+void pwlog_write(FILE *pwlog, struct pw_pid_info *loginfo)
 {
         /*
          *ASSUMPTION: the length of a line is no more than 1023 characters
@@ -40,7 +40,7 @@ void pwlog_write(FILE *pwlog, struct pw_log_info *loginfo)
          *For the pid_t data type, POSIX standard                    
          *guarantees that it will fit in a long integer,so we cast it 
          */
-        switch (loginfo->log_type) {
+        switch (loginfo->type) {
         case INFO_INIT:
                 fprintf(pwlog,
                         " Info: Initializing monitoring of "
@@ -53,7 +53,7 @@ void pwlog_write(FILE *pwlog, struct pw_log_info *loginfo)
                 break;
         case INFO_REPORT:
                 fprintf(pwlog, " Info: Exiting. %zu process(es) killed.\n",
-                        loginfo->num_term);
+                        num_killed);
                 break;
         case ACTION_KILL:
                 fprintf(pwlog,
@@ -61,7 +61,7 @@ void pwlog_write(FILE *pwlog, struct pw_log_info *loginfo)
                         "after exceeding %u seconds.\n",
                         (long)loginfo->watched_pid,
                         loginfo->process_name,
-                        loginfo->wait_threshold);
+                        loginfo->cwait_threshold);
                 break;
         }
         fflush(pwlog);

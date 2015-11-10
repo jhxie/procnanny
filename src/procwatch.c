@@ -28,10 +28,11 @@
 
 #include "memwatch.h"
 
+size_t num_killed                         = 0;
 /*
- *watched_pid_bst is used for storing struct pw_watched_pid_info
+ *pw_pid_bst is used for storing struct pw_pid_info
  */
-static struct bst *wpid_bst = NULL;
+static struct bst *pw_pid_bst               = NULL;
 static volatile sig_atomic_t sig_hup_flag = false;
 static volatile sig_atomic_t sig_int_flag = false;
 
@@ -41,7 +42,7 @@ void procwatch(const char *const cfgname)
         setbuf(stdout, NULL);
         procclean();
 
-        wpid_bst = bst_init();
+        pw_pid_bst = bst_init();
         char linebuf[PW_LINEBUF_SIZE] = {};
         FILE *pwlog = pwlog_setup();
         struct pw_log_info loginfo = {};
@@ -79,7 +80,7 @@ void procwatch(const char *const cfgname)
         fclose_or_die(pwlog);
         zerofree(pid_pair_array);
         */
-        bst_destroy(&wpid_bst);
+        bst_destroy(&pw_pid_bst);
 }
 
 static void procclean(void)
@@ -109,72 +110,92 @@ static void procclean(void)
         pclose_or_die(clean_pipe);
 }
 
+              /*Communication Protocol between parent and child*/
+/*
+                           +------+--------+-------+
+                           |      | parent | child |
+                           +------+--------+-------+
+                           |pipe1 | read   | write |
+                           |pipe2 | write  | read  |
+                           +------+--------+-------+
+
+                              from Child Processes
+                +--------+------------------------------------+
+                |Content | Meaning                            |
+                +--------+------------------------------------+
+                |  "0"   | Failed to kill the specied process |
+                |  "1"   | Success                            |
+                |  "2"   | Invalid message size(quit)         |
+                +--------+------------------------------------+
+
+                              from Parent Process
+                           +------------------------+
+                           |pid_t    watched_pid    |
+                           |unsigned wait_threshold |
+                           +------------------------+
+ */
 static void work_dispatch(FILE *pwlog, const struct pw_cfg_info *const cfginfo)
 {
         bool process_not_found = true;
         char linebuf[PW_LINEBUF_SIZE] = {};
         char *endptr = NULL;
         FILE *pidof_pipe = pidof_popenr(cfginfo->process_name);
-        struct pw_log_info loginfo = {
-                .wait_threshold = cfginfo->wait_threshold,
-                .process_name = cfginfo->process_name
-        };
-        struct pw_watched_pid_info wpid_info = {
-                .child_pid = 0,
-                .watched_pid = 0,
+        struct pw_pid_info wpid_info = {
+                .child_pid       = 0,
+                .watched_pid     = 0,
                 .cwait_threshold = cfginfo->wait_threshold,
                 .pwait_threshold = 0,
         };
-        struct pw_watched_pid_info *tmp_ptr;
+        struct pw_pid_info *tmp_ptr;
         strcpy(wpid_info.process_name, cfginfo->process_name);
-        uintmax_t watched_pid = 0;
-        pid_t child_pid;
         int tmp_fdes1[2], tmp_fdes2[2];
 
         while (NULL != fgets(linebuf, sizeof linebuf, pidof_pipe)) {
                 process_not_found = false;
-                watched_pid = strtoumax(linebuf, &endptr, 10);
+                wpid_info.watched_pid = (pid_t)strtoumax(linebuf, &endptr, 10);
+
+                /*
+                 *not possible for wpid_bst to be NULL here
+                 *so errno is un-checked;
+                 *if the pid is already monitored, proceed
+                 *to the next pid
+                 */
+                if (NULL != bst_find(pw_pid_bst, wpid_info.watched_pid))
+                        continue;
 
                 /*
                  *note I use 2 parallel unidirectional pipes to do ipc
                  *between child and parent
                  */
-
-                /*fill in the rest wpid_info*/
-                /*
-                 * +------+--------+-------+
-                 * |      | parent | child |
-                 * +------+--------+-------+
-                 * |pipe1 | read   | write |
-                 * |pipe2 | write  | read  |
-                 * +------+--------+-------+
-                 */
                 pipe_or_die(tmp_fdes1);
                 pipe_or_die(tmp_fdes2);
-                /*fill in the rest wpid_info*/
 
-                child_pid = fork_or_die();
-                switch (child_pid) {
+                wpid_info.child_pid = fork_or_die();
+                switch (wpid_info.child_pid) {
                 case 0:
                         WORK_DISPATCH_CHILD_CLEANUP();
-                        process_monitor((pid_t)watched_pid,
-                                        loginfo.wait_threshold,
-                                        tmp_fdes2[0],
-                                        tmp_fdes1[1]);
+                        process_monitor(tmp_fdes2[0], tmp_fdes1[1]);
                         /*NEVER REACHED AGAIN*/
                         break;
                 default:
                         /*Parent write INFO_INIT log*/
-                        loginfo.log_type = INFO_INIT;
-                        loginfo.watched_pid = (pid_t)watched_pid;
-                        pwlog_write(pwlog, &loginfo);
+                        wpid_info.type = INFO_INIT;
+                        wpid_info.watched_pid = (pid_t)wpid_info.watched_pid;
+                        pwlog_write(pwlog, &wpid_info);
 
                         WORK_DISPATCH_PARENT_CLEANUP();
+                        /*write_or_die(wpid_info.ipc_fdes[1],*/
                         errno = 0;
-                        tmp_ptr = bst_add(wpid_bst,
-                                          watched_pid,
+                        tmp_ptr = bst_add(pw_pid_bst,
+                                          wpid_info.watched_pid,
                                           1,
-                                          sizeof(struct pw_watched_pid_info));
+                                          sizeof(struct pw_pid_info));
+                        /*
+                         *note that duplicate keys are not possible because
+                         *it is checked previously; so the only case the
+                         *bst_add() can fail is SIZE_MAX is about to be reached
+                         *(impossible for wpid_bst to be NULL)
+                         */
                         if (NULL != tmp_ptr) {
                                 *tmp_ptr = wpid_info;
                         } else if (EOVERFLOW == errno || EINVAL == errno) {
@@ -188,19 +209,29 @@ static void work_dispatch(FILE *pwlog, const struct pw_cfg_info *const cfginfo)
         }
         if (true == process_not_found) {
                 /*Parent write INFO_NOEXIST log*/
-                loginfo.log_type = INFO_NOEXIST;
-                pwlog_write(pwlog, &loginfo);
+                wpid_info.type = INFO_NOEXIST;
+                pwlog_write(pwlog, &wpid_info);
         }
         pclose_or_die(pidof_pipe);
 }
 
-static void process_monitor(pid_t    watched_process_id,
-                            unsigned wait_threshold,
-                            int      readdes,
-                            int      writedes)
+static void process_monitor(int readdes, int writedes)
 {
-
-        sleep(wait_threshold);
+        /*
+         *For extra safety, block all (except SIGINT and SIGKILL) signals
+         *in case the SIGINT or SIGHUP signal is generated on the controlling
+         *terminal; which would send the signal to the whole process group.
+         */
+        sigset_t block_mask;
+        sigfillset_or_die(&block_mask);
+        sigprocmask_or_die(SIG_SETMASK, &block_mask, NULL);
+        const char *READ_PIPE_FAIL_MSG       = "child: invalid message size\n";
+        char        readbuf[CHILD_READ_SIZE] = {};
+        pid_t       watched_pid              = 0;
+        pid_t      *watched_pid_ptr          = NULL;
+        unsigned    wait_threshold           = 0;
+        unsigned   *wait_threshold_ptr       = NULL;
+        memset(readbuf, 0, CHILD_READ_SIZE);
         /*
          *Even though the checking is performed on errno after the
          *process is killed, we still have a potential problem
@@ -208,36 +239,58 @@ static void process_monitor(pid_t    watched_process_id,
          *pid same as the one before;
          *The recycling nature of pid is IGNORED.
          */
-        errno = 0;
-        /*
-         *This is a guaranteed kill if the listed 2 cases
-         *do not apply, so SIGKILL is used rather than SIGTERM
-         */
-        if (0 != kill(watched_process_id, SIGKILL)) {
-                switch (errno) {
-                case EPERM:
+        while (true) {
+                /*
+                 *the read would block the child once it is waiting for
+                 *the parent to give information about the next process
+                 *to monitor
+                 */
+                if (CHILD_READ_SIZE != read(readdes, readbuf, CHILD_READ_SIZE)){
                         /*
-                         *This process does not have the permission
-                         *to kill the watched process.
+                         *Posix 1 guarantees that a read of size less than
+                         *PIPE_BUF is atomic, here since CHILD_READ_SIZE is
+                         *less than PIPE_BUF(512 bytes), so normally this read()
+                         *call would succeed
                          */
-                case ESRCH:
-                        /*
-                         *If the watched process no longer exist,
-                         *the monitor action is considered "failed".
-                         */
-
-                        /*
-                        pid_array_destroy();
-                        */
-                        close_or_die(readdes);
-                        close_or_die(writedes);
-                        exit(EXIT_FAILURE);
+                        write_or_die(STDERR_FILENO,
+                                     READ_PIPE_FAIL_MSG,
+                                     strlen(READ_PIPE_FAIL_MSG));
+                        write_or_die(writedes, "2", 2);
                         break;
                 }
+
+                watched_pid_ptr = (pid_t *)readbuf;
+                watched_pid = *watched_pid_ptr;
+                wait_threshold_ptr = (unsigned *)(watched_pid_ptr + 1);
+                wait_threshold = *wait_threshold_ptr;
+
+                if (-1 == watched_pid)
+                        break;
+                sleep(wait_threshold);
+                /*
+                 *This is a guaranteed kill if the listed 2 cases
+                 *do not apply, so SIGKILL is used rather than SIGTERM
+                 */
+                errno = 0;
+                if (0 != kill(watched_pid, SIGKILL)) {
+                        switch (errno) {
+                        case EPERM:
+                                /*
+                                 *This process does not have the permission
+                                 *to kill the watched process.
+                                 */
+                        case ESRCH:
+                                /*
+                                 *If the watched process no longer exist,
+                                 *the monitor action is considered "failed".
+                                 */
+                        default: /*Added for extra safety*/ 
+                                write_or_die(writedes, "0", 2);
+                        }
+                } else {
+                        write_or_die(writedes, "1", 2);
+                }
         }
-        /*
-        pid_array_destroy();
-        */
         close_or_die(readdes);
         close_or_die(writedes);
         exit(EXIT_SUCCESS);

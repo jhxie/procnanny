@@ -1,5 +1,5 @@
 /*
- *Note: this implementation is based on the concepts and code examples from
+ *Note: this implementation is mostly based on the code examples from
  *http://www.eternallyconfuzzled.com/tuts/datastructures/jsw_tut_bst1.aspx
  *the code is modified extensively to suit the need of procnanny.
  */
