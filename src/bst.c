@@ -128,6 +128,15 @@ void *bst_add(struct bst *current_bst, long key, size_t blknum, size_t blksize)
         return bstnode->memblk;
 }
 
+long bst_rootkey(struct bst *current_bst)
+{
+        if (NULL == current_bst || NULL == current_bst->root) {
+                errno = EINVAL;
+                return -1;
+        }
+        return current_bst->root->key;
+}
+
 int bst_del(struct bst *current_bst, long key)
 {
         if (NULL == current_bst) {

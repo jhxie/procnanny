@@ -29,10 +29,11 @@
 #include "memwatch.h"
 
 size_t num_killed                         = 0;
-/*
- *pw_pid_bst is used for storing struct pw_pid_info
- */
-static struct bst *pw_pid_bst               = NULL;
+/*pw_pid_bst is used for storing struct pw_pid_info*/
+static struct bst *pw_pid_bst             = NULL;
+/*pw_idle_bst is used for storing the info of idle children*/
+static struct bst *pw_idle_bst            = NULL;
+static FILE *pwlog                        = NULL;
 static volatile sig_atomic_t sig_hup_flag = false;
 static volatile sig_atomic_t sig_int_flag = false;
 
@@ -43,8 +44,9 @@ void procwatch(const char *const cfgname)
         procclean();
 
         pw_pid_bst = bst_init();
+        pw_idle_bst = bst_init();
         char linebuf[PW_LINEBUF_SIZE] = {};
-        FILE *pwlog = pwlog_setup();
+        pwlog = pwlog_setup();
         struct pw_log_info loginfo = {};
         int child_return_status;
         size_t numcfgline = config_parse(cfgname);
@@ -81,6 +83,7 @@ void procwatch(const char *const cfgname)
         zerofree(pid_pair_array);
         */
         bst_destroy(&pw_pid_bst);
+        bst_destroy(&pw_idle_bst);
 }
 
 static void procclean(void)
@@ -134,7 +137,7 @@ static void procclean(void)
                            |unsigned wait_threshold |
                            +------------------------+
  */
-static void work_dispatch(FILE *pwlog, const struct pw_cfg_info *const cfginfo)
+static void work_dispatch(const struct pw_cfg_info *const cfginfo)
 {
         bool process_not_found = true;
         char linebuf[PW_LINEBUF_SIZE] = {};
@@ -147,9 +150,9 @@ static void work_dispatch(FILE *pwlog, const struct pw_cfg_info *const cfginfo)
                 .cwait_threshold = cfginfo->wait_threshold,
                 .pwait_threshold = 0,
         };
-        struct pw_pid_info *tmp_ptr;
+        struct pw_pid_info *wpid_info_ptr;
+        struct pw_idle_info *idle_info_ptr;
         strcpy(wpid_info.process_name, cfginfo->process_name);
-        int tmp_fdes1[2], tmp_fdes2[2];
 
         while (NULL != fgets(linebuf, sizeof linebuf, pidof_pipe)) {
                 process_not_found = false;
@@ -164,56 +167,47 @@ static void work_dispatch(FILE *pwlog, const struct pw_cfg_info *const cfginfo)
                 if (NULL != bst_find(pw_pid_bst, wpid_info.watched_pid))
                         continue;
 
-                /*
-                 *note I use 2 parallel unidirectional pipes to do ipc
-                 *between child and parent
-                 */
-                pipe_or_die(tmp_fdes1);
-                pipe_or_die(tmp_fdes2);
-
-                wpid_info.child_pid = fork_or_die();
-                switch (wpid_info.child_pid) {
-                case 0:
-                        WORK_DISPATCH_CHILD_CLEANUP();
-                        process_monitor(tmp_fdes2[0], tmp_fdes1[1]);
-                        /*NEVER REACHED AGAIN*/
-                        break;
-                default:
-                        /*Parent write INFO_INIT log*/
-                        wpid_info.type = INFO_INIT;
-                        pwlog_write(pwlog, &wpid_info);
-
-                        WORK_DISPATCH_PARENT_CLEANUP();
-
-                        *((pid_t *)writebuf)                     =
-                                wpid_info.watched_pid;
-                        *((unsigned *)(((pid_t *)writebuf) + 1)) =
-                                wpid_info.cwait_threshold;
-                        write_or_die(wpid_info.ipc_fdes[1],
-                                     writebuf,
-                                     PW_CHILD_READ_SIZE);
-
-                        errno = 0;
-                        tmp_ptr = bst_add(pw_pid_bst,
-                                          wpid_info.watched_pid,
-                                          1,
-                                          sizeof(struct pw_pid_info));
-                        /*
-                         *note that duplicate keys are not possible because
-                         *it is checked previously; so the only case the
-                         *bst_add() can fail is SIZE_MAX is about to be reached
-                         *(impossible for wpid_bst to be NULL)
-                         */
-                        if (NULL != tmp_ptr) {
-                                *tmp_ptr = wpid_info;
-                        } else if (EOVERFLOW == errno || EINVAL == errno) {
-                                        errx(EXIT_FAILURE, "bst : error");
-                        }
-                        /*
-                         *the watched_pid has already been monitored, do nothing
-                         */
-                        break;
+                /*use exsiting children if there are idle ones*/
+                if (false == bst_isempty(pw_idle_bst)) {
+                        idle_info_ptr =
+                                bst_find(pw_idle_bst, bst_rootkey(pw_idle_bst));
+                        wpid_info.child_pid = idle_info_ptr->child_pid;
+                        wpid_info.ipc_fdes[0] = idle_info_ptr->ipc_fdes[0];
+                        wpid_info.ipc_fdes[1] = idle_info_ptr->ipc_fdes[1];
+                        bst_del(pw_idle_bst, bst_rootkey(pw_idle_bst));
                 }
+
+                /*Parent write INFO_INIT log*/
+                wpid_info.type = INFO_INIT;
+                pwlog_write(pwlog, &wpid_info);
+
+                *((pid_t *)writebuf)                     =
+                        wpid_info.watched_pid;
+                *((unsigned *)(((pid_t *)writebuf) + 1)) =
+                        wpid_info.cwait_threshold;
+                write_or_die(wpid_info.ipc_fdes[1],
+                             writebuf,
+                             PW_CHILD_READ_SIZE);
+
+                errno = 0;
+                wpid_info_ptr = bst_add(pw_pid_bst,
+                                  wpid_info.watched_pid,
+                                  1,
+                                  sizeof(struct pw_pid_info));
+                /*
+                 *note that duplicate keys are not possible because
+                 *it is checked previously; so the only case the
+                 *bst_add() can fail is SIZE_MAX is about to be reached
+                 *(impossible for wpid_bst to be NULL)
+                 */
+                if (NULL != wpid_info_ptr) {
+                        *wpid_info_ptr = wpid_info;
+                } else if (EOVERFLOW == errno || EINVAL == errno) {
+                                errx(EXIT_FAILURE, "bst : error");
+                }
+                /*
+                 *the watched_pid has already been monitored, do nothing
+                 */
         }
         if (true == process_not_found) {
                 /*Parent write INFO_NOEXIST log*/
@@ -221,6 +215,42 @@ static void work_dispatch(FILE *pwlog, const struct pw_cfg_info *const cfginfo)
                 pwlog_write(pwlog, &wpid_info);
         }
         pclose_or_die(pidof_pipe);
+}
+
+/*
+ *This function creates another child aned setups the ipc channel between the
+ *newly created child and the caller.
+ *The ipc channel is recorded in the ipc_fdes field of struct pw_pid_info.
+ *The child calls process_monitor() and NEVER returns.
+ */
+static void child_create(FILE *pidof_pipe, struct pw_pid_info *const wpid_info)
+{
+        /*
+         *note I use 2 parallel unidirectional pipes to do ipc
+         *between child and parent
+         */
+        int tmp_fdes1[2], tmp_fdes2[2];
+        pipe_or_die(tmp_fdes1);
+        pipe_or_die(tmp_fdes2);
+        wpid_info->child_pid = fork_or_die();
+
+        switch (wpid_info->child_pid) {
+        case 0:
+                bst_destroy(&pw_pid_bst);
+                bst_destroy(&pw_idle_bst);
+                pclose(pidof_pipe);
+                fclose_or_die(pwlog);
+                close_or_die(tmp_fdes1[0]);
+                close_or_die(tmp_fdes2[1]);
+                process_monitor(tmp_fdes2[0], tmp_fdes1[1]);
+                /*NEVER REACHED AGAIN*/
+        default:
+                close_or_die(tmp_fdes1[1]);
+                close_or_die(tmp_fdes2[0]);
+                wpid_info->ipc_fdes[0] = tmp_fdes1[0];
+                wpid_info->ipc_fdes[1] = tmp_fdes2[1];
+                return;
+        }
 }
 
 static void process_monitor(int readdes, int writedes)

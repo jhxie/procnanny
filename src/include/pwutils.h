@@ -3,27 +3,11 @@
 
 #include <stdio.h>
 
-#define WORK_DISPATCH_CHILD_CLEANUP() \
-        do { \
-                bst_destroy(&pw_pid_bst); \
-                pclose(pidof_pipe); \
-                fclose_or_die(pwlog); \
-                close_or_die(tmp_fdes1[0]); \
-                close_or_die(tmp_fdes2[1]); \
-        } while (0)
-
-#define WORK_DISPATCH_PARENT_CLEANUP() \
-	do { \
-		close_or_die(tmp_fdes1[1]); \
-		close_or_die(tmp_fdes2[0]); \
-		wpid_info.ipc_fdes[0] = tmp_fdes1[0]; \
-		wpid_info.ipc_fdes[1] = tmp_fdes2[1]; \
-	} while (0)
-
 static void procclean(void);
-static void work_dispatch(FILE *pwlog, const struct pw_cfg_info *const cfginfo);
-static FILE *pidof_popenr(const char *const process_name)
-        __attribute__((warn_unused_result));
+static void work_dispatch(const struct pw_cfg_info *const cfginfo);
+static void child_create(FILE *pidof_pipe, struct pw_pid_info *const wpid_info);
 static void process_monitor(int readdes, int writedes)
                 __attribute__((noreturn));
+static FILE *pidof_popenr(const char *const process_name)
+        __attribute__((warn_unused_result));
 #endif

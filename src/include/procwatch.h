@@ -16,13 +16,18 @@
 #define PW_CHILD_READ_SIZE ((ssize_t)(sizeof(pid_t) + sizeof(unsigned)))
 
 struct pw_pid_info {
-    enum { INFO_INIT, INFO_NOEXIST, INFO_REPORT, ACTION_KILL } type;
-    pid_t watched_pid;
-    pid_t child_pid;
-    unsigned cwait_threshold;
-    unsigned pwait_threshold;
-    char process_name[PW_LINEBUF_SIZE];
-    int ipc_fdes[2];
+        enum { INFO_INIT, INFO_NOEXIST, INFO_REPORT, ACTION_KILL } type;
+        pid_t watched_pid;
+        pid_t child_pid;
+        unsigned cwait_threshold;
+        unsigned pwait_threshold;
+        char process_name[PW_LINEBUF_SIZE];
+        int ipc_fdes[2];
+};
+
+struct pw_idle_info {
+        pid_t child_pid;
+        int ipc_fdes[2];
 };
 
 extern size_t num_killed;
