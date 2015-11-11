@@ -34,8 +34,6 @@ static struct bst *pw_pid_bst                   = NULL;
 /*pw_idle_bst is used for storing the info of idle children*/
 static struct bst *pw_idle_bst                  = NULL;
 static FILE *pwlog                              = NULL;
-static pid_t delele_ready_pids[PW_LINEBUF_SIZE] = {};
-static size_t delele_ready_idx                  = 0;
 static volatile sig_atomic_t sig_hup_flag       = false;
 static volatile sig_atomic_t sig_int_flag       = false;
 
@@ -60,51 +58,8 @@ void procwatch(const char *const cfgname)
                         work_dispatch(&pw_cfg_vector[i]);
                 }
                 sleep(5U);
-                pw_pid_bst_add_interval(pw_pid_bst, 5U);
-                pid_info_ptr = bst_first(&trav, pw_pid_bst);
-                while (NULL != pid_info_ptr) {
-                        if (pid_info_ptr->pwait_threshold >=
-                            pid_info_ptr->cwait_threshold) {
-                                read_or_die(pid_info_ptr->ipc_fdes[0],
-                                            linebuf,
-                                            2);
-                                /*failed to kill the specified process*/
-                                if (0 == strcmp(linebuf, "0")) {
-                                        have_idle = true;
-                                /*successfully killed the process*/
-                                } else if (0 == strcmp(linebuf, "1")) {
-                                        have_idle = true;
-                                        pid_info_ptr->type = ACTION_KILL;
-                                        pwlog_write(pwlog, pid_info_ptr);
-                                        num_killed++;
-                                /*invalid pipe message, child quits*/
-                                } else if (0 == strcmp(linebuf, "2")) {
-                                }
-
-                                if (true == have_idle) {
-                                        have_idle = false;
-                                        idle_info_ptr =
-                                                bst_add(pw_idle_bst,
-                                                pid_info_ptr->child_pid,
-                                                1,
-                                                sizeof(struct pw_idle_info));
-                                        idle_info_ptr->child_pid =
-                                                pid_info_ptr->child_pid;
-                                        idle_info_ptr->ipc_fdes[0] =
-                                                pid_info_ptr->ipc_fdes[0];
-                                        idle_info_ptr->ipc_fdes[1] =
-                                                pid_info_ptr->ipc_fdes[1];
-                                }
-                                delele_ready_pids[delele_ready_idx] =
-                                        pid_info_ptr->watched_pid;
-                                delele_ready_idx++;
-                        }
-                        pid_info_ptr = bst_next(&trav);
-                }
-                for (size_t i = 0; i < delele_ready_idx; ++i) {
-                        bst_del(pw_pid_bst, delele_ready_pids[i]);
-                }
-                delele_ready_idx = 0;
+                pw_pid_bst_interval_add(pw_pid_bst, 5U);
+                pw_pid_bst_refresh(pw_pid_bst, pw_idle_bst, pwlog);
         }
 
         /*
