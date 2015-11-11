@@ -194,6 +194,7 @@ int bst_destroy(struct bst **current_bst)
                 return -1;
         }
 
+        struct pw_pid_info *pid_info_ptr;
         struct bst_node_ *tmp_ptr = (*current_bst)->root;
         struct bst_node_ *saveptr;
 
@@ -204,6 +205,9 @@ int bst_destroy(struct bst **current_bst)
                         saveptr->link[BST_RIGHT] = tmp_ptr;
                 } else {
                         saveptr = tmp_ptr->link[BST_RIGHT];
+                        pid_info_ptr = tmp_ptr->memblk;
+                        close(pid_info_ptr->ipc_fdes[0]);
+                        close(pid_info_ptr->ipc_fdes[1]);
                         free(tmp_ptr->memblk);
                         free(tmp_ptr);
                 }

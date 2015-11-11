@@ -65,6 +65,8 @@ void procwatch(const char *const cfgname)
                 if (true == sig_int_flag) {
                         sig_int_flag = false;
                         pwlog_write(pwlog, &((struct pw_pid_info){}));
+                        // write message to all processes in working or sleep
+                        // state
                         printf("%zu process(es) killed\n", num_killed);
                         break;
                 }
