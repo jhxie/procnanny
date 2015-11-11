@@ -49,9 +49,6 @@ void procwatch(const char *const cfgname)
         char linebuf[PW_LINEBUF_SIZE] = {};
         pwlog = pwlog_setup();
         size_t numcfgline = config_parse(cfgname);
-        struct bst_trav trav;
-        struct pw_pid_info *pid_info_ptr;
-        struct pw_idle_info *idle_info_ptr;
 
         while (true) {
                 for (size_t i = 0; i < numcfgline; ++i) {

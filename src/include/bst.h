@@ -14,10 +14,6 @@ struct bst {
         size_t numnode;
 };
 
-struct bst_trav {
-        struct bst_node_ *tmp_ptr;
-};
-
 struct bst *bst_init(void)
         __attribute__((warn_unused_result));
 void *bst_find(struct bst *current_bst, long key)
