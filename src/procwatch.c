@@ -80,33 +80,7 @@ void procwatch(const char *const cfgname)
                 }
         }
 
-        /*
-         *Once the main process has dispatched the work to all the
-         *worker processes, wait for them to finish so they would
-         *not become zombies.
-         */
-        /*
-        errno = 0;
-        loginfo.num_term = 0;
-        for (size_t i = 0; i < pid_pair_array_index; ++i) {
-                waitpid(pid_pair_array[i].child_pid, &child_return_status, 0);
-                if (WIFEXITED(child_return_status) &&
-                    EXIT_SUCCESS == WEXITSTATUS(child_return_status)) {
-                        loginfo.num_term++;
-                        loginfo.log_type = ACTION_KILL;
-                        loginfo.watched_pid = pid_pair_array[i].watched_pid;
-                        loginfo.process_name = pid_pair_array[i].process_name;
-                        loginfo.wait_threshold = pid_pair_array[i].wait_threshold;
-                        pwlog_write(pwlog, &loginfo);
-                        zerofree(pid_pair_array[i].process_name);
-                }
-        }
-
-        loginfo.log_type = INFO_REPORT;
-        pwlog_write(pwlog, &loginfo);
         fclose_or_die(pwlog);
-        zerofree(pid_pair_array);
-        */
         bst_destroy(&pw_pid_bst);
         bst_destroy(&pw_idle_bst);
 }
