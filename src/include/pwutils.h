@@ -12,4 +12,5 @@ static void process_monitor(int readdes, int writedes)
 static FILE *pidof_popenr(const char *const process_name)
         __attribute__((warn_unused_result));
 static void signal_handle(int sig);
+static void clean_up(void);
 #endif

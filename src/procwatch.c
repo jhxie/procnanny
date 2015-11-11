@@ -43,6 +43,11 @@ void procwatch(const char *const cfgname)
         configname = cfgname;
         pw_pid_bst = bst_init();
         pw_idle_bst = bst_init();
+
+        if (0 != atexit(clean_up)) {
+                errx(EXIT_FAILURE, "atexit() : failed to register clean_up()");
+        }
+
         pwlog = pwlog_setup();
         size_t numcfgline = config_parse(cfgname);
         struct sigaction sa = {
@@ -81,8 +86,6 @@ void procwatch(const char *const cfgname)
         }
 
         fclose_or_die(pwlog);
-        bst_destroy(&pw_pid_bst);
-        bst_destroy(&pw_idle_bst);
 }
 
 static void procclean(void)
@@ -190,11 +193,11 @@ static void parent_msg_write(struct pw_pid_info *const wpid_info)
 {
         char writebuf[PW_CHILD_READ_SIZE] = {};
         struct pw_pid_info *wpid_info_ptr;
+        pid_t *pid_ptr = (pid_t *)writebuf;
+        unsigned *unsigned_ptr = (unsigned *)(pid_ptr + 1);
 
-        *((pid_t *)writebuf)                     =
-                wpid_info->watched_pid;
-        *((unsigned *)(((pid_t *)writebuf) + 1)) =
-                wpid_info->cwait_threshold;
+        *pid_ptr = wpid_info->watched_pid;
+        *unsigned_ptr = wpid_info->cwait_threshold;
         write_or_die(wpid_info->ipc_fdes[1],
                      writebuf,
                      PW_CHILD_READ_SIZE);
@@ -239,8 +242,6 @@ static void child_create(FILE *pidof_pipe, struct pw_pid_info *const wpid_info)
 
         switch (wpid_info->child_pid) {
         case 0:
-                bst_destroy(&pw_pid_bst);
-                bst_destroy(&pw_idle_bst);
                 pclose(pidof_pipe);
                 fclose_or_die(pwlog);
                 close_or_die(tmp_fdes1[0]);
@@ -377,4 +378,10 @@ static void signal_handle(int sig)
                 sig_int_flag = true;
                 break;
         }
+}
+
+static void clean_up(void)
+{
+        bst_destroy(&pw_pid_bst);
+        bst_destroy(&pw_idle_bst);
 }
