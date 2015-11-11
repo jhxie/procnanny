@@ -201,6 +201,7 @@ int bst_destroy(struct bst **current_bst)
         memset(writebuf, 0, PW_CHILD_READ_SIZE);
         pid_t *pid_ptr = (pid_t *)writebuf;
         *pid_ptr  = -1;
+        ssize_t tmp = 0;
 
         while (NULL != tmp_ptr) {
                 if (NULL != tmp_ptr->link[BST_LEFT]) {
@@ -211,7 +212,7 @@ int bst_destroy(struct bst **current_bst)
                         saveptr = tmp_ptr->link[BST_RIGHT];
                         pid_info_ptr = tmp_ptr->memblk;
                         close(pid_info_ptr->ipc_fdes[0]);
-                        (void)write(pid_info_ptr->ipc_fdes[1],
+                        tmp = write(pid_info_ptr->ipc_fdes[1],
                                     writebuf,
                                     PW_CHILD_READ_SIZE);
                         close(pid_info_ptr->ipc_fdes[1]);
