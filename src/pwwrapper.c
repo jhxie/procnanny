@@ -196,3 +196,21 @@ void sigprocmask_or_die(int how, const sigset_t *set, sigset_t *oldset)
                 exit(EXIT_FAILURE);
         }
 }
+
+void sigaction_or_die(int sig,
+                      const struct sigaction *act,
+                      struct sigaction *oldact)
+{
+        if (-1 == sigaction(sig, act, oldact)) {
+                perror("sigaction()");
+                exit(EXIT_FAILURE);
+        }
+}
+
+void sigemptyset_or_die(sigset_t *set)
+{
+        if (-1 == sigemptyset(set)) {
+                perror("sigemptyset()");
+                exit(EXIT_FAILURE);
+        }
+}

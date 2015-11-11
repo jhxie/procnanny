@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <unistd.h>
 
 /*
@@ -42,4 +43,8 @@ ssize_t write_or_die(int fd, const void *buf, size_t n);
 ssize_t read_or_die(int fd, void *buf, size_t n);
 void sigfillset_or_die(sigset_t *set);
 void sigprocmask_or_die(int how, const sigset_t *set, sigset_t *oldset);
+void sigaction_or_die(int sig,
+                      const struct sigaction *act,
+                      struct sigaction *oldact);
+void sigemptyset_or_die(sigset_t *set);
 #endif

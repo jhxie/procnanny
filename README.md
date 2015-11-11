@@ -34,5 +34,9 @@ TA Name:             Luke Nitish Kumar
   time; however, "re-definition" is allowed if the file is re-read (caught a
   SIGHUP signal).
 
-4.The length of the program name to be monitored is no longer than 1024
+4.The length of the program name to be monitored is no more than 1023
   characters as well(based on ASSUMPTION #1).
+
+5.The size of deletion queue is assumed to be 1024 at maximum; this queue is
+  used for storing information about deletion of the pw\_pid\_info structure
+  upon the success/failure of a monitored process.

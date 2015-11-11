@@ -39,16 +39,21 @@ static volatile sig_atomic_t sig_int_flag       = false;
 
 void procwatch(const char *const cfgname)
 {
-        /*Make stdout unbuffered.*/
-        setbuf(stdout, NULL);
-        procclean();
-
         pw_pid_bst = bst_init();
         pw_idle_bst = bst_init();
         bool have_idle = false;
         char linebuf[PW_LINEBUF_SIZE] = {};
         pwlog = pwlog_setup();
         size_t numcfgline = config_parse(cfgname);
+        struct sigaction sa = {
+                .sa_handler = signal_handle,
+                .sa_flags = SA_RESTART,
+        };
+        sigemptyset_or_die(&sa.sa_mask);
+        sigaction_or_die(SIGINT, &sa, NULL);
+        
+        setbuf(stdout, NULL); /*Make stdout unbuffered.*/
+        procclean();
 
         while (true) {
                 for (size_t i = 0; i < numcfgline; ++i) {
@@ -57,6 +62,15 @@ void procwatch(const char *const cfgname)
                 sleep(5U);
                 pw_pid_bst_interval_add(pw_pid_bst, 5U);
                 pw_pid_bst_refresh(pw_pid_bst, pw_idle_bst, pwlog);
+                if (true == sig_int_flag) {
+                        sig_int_flag = false;
+                        pwlog_write(pwlog, &((struct pw_pid_info){}));
+                        printf("%zu process(es) killed\n", num_killed);
+                        break;
+                }
+                if (true == sig_hup_flag) {
+                        sig_hup_flag = false;
+                }
         }
 
         /*
@@ -365,4 +379,16 @@ static FILE *pidof_popenr(const char *const process_name)
         zerofree(cmd_buffer);
 
         return pidof_pipe;
+}
+
+static void signal_handle(int sig)
+{
+        switch (sig) {
+        case SIGHUP:
+                sig_hup_flag = true;
+                break;
+        case SIGINT:
+                sig_int_flag = true;
+                break;
+        }
 }

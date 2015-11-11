@@ -261,14 +261,16 @@ static void pw_pid_bst_refresh_helper(struct bst_node_ *root)
                 /*failed to kill the specified process*/
                 if (0 == strcmp(linebuf, "0")) {
                         have_idle = true;
-                        /*successfully killed the process*/
+                /*successfully killed the process*/
                 } else if (0 == strcmp(linebuf, "1")) {
                         have_idle = true;
                         pid_info_ptr->type = ACTION_KILL;
                         pwlog_write(logfile, pid_info_ptr);
                         num_killed++;
-                        /*invalid pipe message, child quits*/
+                /*invalid pipe message, child quits*/
                 } else if (0 == strcmp(linebuf, "2")) {
+                        close_or_die(pid_info_ptr->ipc_fdes[0]);
+                        close_or_die(pid_info_ptr->ipc_fdes[1]);
                 }
 
                 if (true == have_idle) {
