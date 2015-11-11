@@ -34,7 +34,6 @@ void pwlog_write(FILE *pwlog, struct pw_pid_info *loginfo)
         snprintf(timestr, strlen(timebuf) + 3, "[%s]", timebuf);
         /*Print the time field only*/
         fputs_or_die(timestr, pwlog);
-        zerofree(timestr);
 
         /*
          *For the pid_t data type, POSIX standard                    
@@ -52,8 +51,26 @@ void pwlog_write(FILE *pwlog, struct pw_pid_info *loginfo)
                         loginfo->process_name);
                 break;
         case INFO_REPORT:
-                fprintf(pwlog, " Info: Exiting. %zu process(es) killed.\n",
+                fprintf(pwlog,
+                        " Info: Caught SIGINT. Exiting cleanly. %zu "
+                        "process(es) killed.\n",
                         num_killed);
+                fputs_or_die(timestr, stdout);
+                fprintf(stdout,
+                        " Info: Caught SIGINT. Exiting cleanly. %zu "
+                        "process(es) killed.\n",
+                        num_killed);
+                break;
+        case INFO_REREAD:
+                fprintf(pwlog,
+                        "  Info: Caught SIGHUP. "
+                        "Configuration file \'%s\' re-read.\n",
+                        configname);
+                fputs_or_die(timestr, stdout);
+                fprintf(stdout,
+                        "  Info: Caught SIGHUP. "
+                        "Configuration file \'%s\' re-read.\n",
+                        configname);
                 break;
         case ACTION_KILL:
                 fprintf(pwlog,
@@ -64,6 +81,7 @@ void pwlog_write(FILE *pwlog, struct pw_pid_info *loginfo)
                         loginfo->cwait_threshold);
                 break;
         }
+        zerofree(timestr);
         fflush(pwlog);
 }
 

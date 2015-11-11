@@ -16,7 +16,9 @@
 #define PW_CHILD_READ_SIZE ((ssize_t)(sizeof(pid_t) + sizeof(unsigned)))
 
 struct pw_pid_info {
-        enum { INFO_INIT, INFO_NOEXIST, INFO_REPORT, ACTION_KILL } type;
+        enum {
+                INFO_INIT, INFO_NOEXIST, INFO_REPORT,
+                INFO_REREAD, ACTION_KILL } type;
         pid_t watched_pid;
         pid_t child_pid;
         unsigned cwait_threshold;
@@ -30,6 +32,7 @@ struct pw_idle_info {
         int ipc_fdes[2];
 };
 
+extern const char *configname;
 extern size_t num_killed;
 
 void procwatch(const char *const cfgname);

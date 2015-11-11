@@ -28,29 +28,30 @@
 
 #include "memwatch.h"
 
-size_t num_killed                               = 0;
+const char *configname                    = NULL;
+size_t num_killed                         = 0;
 /*pw_pid_bst is used for storing struct pw_pid_info*/
-static struct bst *pw_pid_bst                   = NULL;
+static struct bst *pw_pid_bst             = NULL;
 /*pw_idle_bst is used for storing the info of idle children*/
-static struct bst *pw_idle_bst                  = NULL;
-static FILE *pwlog                              = NULL;
-static volatile sig_atomic_t sig_hup_flag       = false;
-static volatile sig_atomic_t sig_int_flag       = false;
+static struct bst *pw_idle_bst            = NULL;
+static FILE *pwlog                        = NULL;
+static volatile sig_atomic_t sig_hup_flag = false;
+static volatile sig_atomic_t sig_int_flag = false;
 
 void procwatch(const char *const cfgname)
 {
+        configname = cfgname;
         pw_pid_bst = bst_init();
         pw_idle_bst = bst_init();
-        bool have_idle = false;
-        char linebuf[PW_LINEBUF_SIZE] = {};
         pwlog = pwlog_setup();
         size_t numcfgline = config_parse(cfgname);
         struct sigaction sa = {
                 .sa_handler = signal_handle,
-                .sa_flags = SA_RESTART,
+                /*.sa_flags = SA_RESTART,*/
         };
         sigemptyset_or_die(&sa.sa_mask);
         sigaction_or_die(SIGINT, &sa, NULL);
+        sigaction_or_die(SIGHUP, &sa, NULL);
         
         setbuf(stdout, NULL); /*Make stdout unbuffered.*/
         procclean();
@@ -64,14 +65,18 @@ void procwatch(const char *const cfgname)
                 pw_pid_bst_refresh(pw_pid_bst, pw_idle_bst, pwlog);
                 if (true == sig_int_flag) {
                         sig_int_flag = false;
-                        pwlog_write(pwlog, &((struct pw_pid_info){}));
-                        // write message to all processes in working or sleep
-                        // state
-                        printf("%zu process(es) killed\n", num_killed);
+                        /*make full use of the compund literals*/
+                        pwlog_write(pwlog,
+                                    &((struct pw_pid_info){
+                                      .type = INFO_REPORT }));
                         break;
                 }
                 if (true == sig_hup_flag) {
                         sig_hup_flag = false;
+                        numcfgline = config_parse(cfgname);
+                        pwlog_write(pwlog,
+                                    &((struct pw_pid_info){
+                                      .type = INFO_REREAD }));
                 }
         }
 
@@ -198,7 +203,7 @@ static void work_dispatch(const struct pw_cfg_info *const cfginfo)
                 +--------+------------------------------------+
                 |  "0"   | Failed to kill the specied process |
                 |  "1"   | Success                            |
-                |  "2"   | Invalid message size(quit)         |
+                |  "2"   | Invalid message size(quit debug)   |
                 +--------+------------------------------------+
 
                               from Parent Process
@@ -287,7 +292,9 @@ static void process_monitor(int readdes, int writedes)
         sigset_t block_mask;
         sigfillset_or_die(&block_mask);
         sigprocmask_or_die(SIG_SETMASK, &block_mask, NULL);
+        /*
         const char *READ_PIPE_FAIL_MSG       = "child: invalid message size\n";
+        */
         char        readbuf[PW_CHILD_READ_SIZE] = {};
         pid_t       watched_pid              = 0;
         pid_t      *watched_pid_ptr          = NULL;
@@ -315,10 +322,13 @@ static void process_monitor(int readdes, int writedes)
                          *less than PIPE_BUF(512 bytes), so normally this read()
                          *call would succeed
                          */
+
+                        /*
                         write_or_die(STDERR_FILENO,
                                      READ_PIPE_FAIL_MSG,
                                      strlen(READ_PIPE_FAIL_MSG));
                         write_or_die(writedes, "2", 2);
+                        */
                         break;
                 }
 

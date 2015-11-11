@@ -197,6 +197,9 @@ int bst_destroy(struct bst **current_bst)
         struct pw_pid_info *pid_info_ptr;
         struct bst_node_ *tmp_ptr = (*current_bst)->root;
         struct bst_node_ *saveptr;
+        char writebuf[PW_CHILD_READ_SIZE] = {};
+        memset(writebuf, 0, PW_CHILD_READ_SIZE);
+        *((pid_t *)writebuf) = -1;
 
         while (NULL != tmp_ptr) {
                 if (NULL != tmp_ptr->link[BST_LEFT]) {
@@ -207,6 +210,9 @@ int bst_destroy(struct bst **current_bst)
                         saveptr = tmp_ptr->link[BST_RIGHT];
                         pid_info_ptr = tmp_ptr->memblk;
                         close(pid_info_ptr->ipc_fdes[0]);
+                        write(pid_info_ptr->ipc_fdes[1],
+                                     writebuf,
+                                     PW_CHILD_READ_SIZE);
                         close(pid_info_ptr->ipc_fdes[1]);
                         free(tmp_ptr->memblk);
                         free(tmp_ptr);
