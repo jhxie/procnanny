@@ -31,10 +31,10 @@ $(OBJS): $(SRCS)
 
 $(BINSDIR)/procnanny_debug: debug_objs
 	@mkdir -p $(BINSDIR)
-	$(CC) $(CFLAGS) $(OBJS) -o $@
+	$(CC) $(CFLAGS) $(OBJS) -o $@ -pg
 
 debug_objs: $(SRCS)
-	$(CC) $(CFLAGS) $(MWFLAGS) $(INCFLAGS) -c $^ -g3 -O0
+	$(CC) $(CFLAGS) $(MWFLAGS) $(INCFLAGS) -c $^ -g3 -O0 -pg
 	-mv *.o $(SRCSDIR)
 
 .PHONY: all rebuild debug rebuild_debug clean
