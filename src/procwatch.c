@@ -45,6 +45,8 @@ void procwatch(const char *const cfgname)
         pw_idle_bst = bst_init();
 
         if (0 != atexit(clean_up)) {
+                bst_destroy(&pw_pid_bst);
+                bst_destroy(&pw_idle_bst);
                 errx(EXIT_FAILURE, "atexit() : failed to register clean_up()");
         }
 
