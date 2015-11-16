@@ -1,3 +1,4 @@
+				    Part II
 getlogin() cannot be used to determine the current user name becuase
 it would always fail if the current process does not have a controlling
 terminal;
@@ -6,3 +7,38 @@ use getpwuid(getuid()) instead.
 SUSv3 requires that PIPE_BUF be at least _POSIX_PIPE_BUF (512). An
 implementation should define PIPE_BUF (in <limits.h>) and/or allow the call
 fpathconf(fd, _PC_PIPE_BUF) to return the actual upper limit for atomic writes.
+
+				    Part III
+SUSv3 allows an implementation to place an upper limit on the value that can be
+specified for backlog, and permits an implementation to silently round backlog
+values down to this limit. SUSv3 specifies that the implementation should
+advertise this limit by defining the constant SOMAXCONN in <sys/socket.h>. On
+Linux, this constant is defined with the value 128. However, since kernel
+2.4.25, Linux allows this limit to be adjusted at run time via the
+Linux-specific /proc/sys/net/core/somaxconn file. (In earlier kernel versions,
+the SOMAXCONN limit is immutable.)
+
+If connect() fails and we wish to reattempt the connection, then SUSv3 specifies
+that the portable method of doing so is to close the socket, create a new
+socket, and reattempt the connection with the new socket.
+
+The BSD-derived function bzero() is an alternative to memset() for zeroing the
+contents of a structure. SUSv3 specifies bzero() and the related bcopy() (which
+is similar to memmove()), but marks both functions LEGACY, noting that memset()
+and memmove() are preferred. SUSv4 removes the specifications of bzero() and
+bcopy().
+
+The inet_aton() and inet_ntoa() functions convert an IPv4 address in
+dotted-decimal notation to binary and vice versa. We describe these functions
+primarily because they appear in historical code. Nowadays, they are obsolete.
+Modern programs that need to do such conversions should use the functions that
+we describe next.
+
+The gethostbyname() function returns the binary IP address(es) corresponding to
+a hostname and the getservbyname() function returns the port number
+corresponding to a service name. The reverse conversions are performed by
+gethostbyaddr() and getservbyport(). We describe these functions because they
+are widely used in existing code. However, they are now obsolete. (SUSv3 marks
+these functions obsolete, and SUSv4 removes their specifications.) New code
+should use the getaddrinfo() and getnameinfo() functions (described next) for
+such conversions.
