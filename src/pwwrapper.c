@@ -214,3 +214,29 @@ void sigemptyset_or_die(sigset_t *set)
                 exit(EXIT_FAILURE);
         }
 }
+
+int socket_or_die(int domain, int type, int protocol)
+{
+        int sockdes;
+        if (-1 == (sockdes = socket(domain, type, protocol))) {
+                perror("socket()");
+                exit(EXIT_FAILURE);
+        }
+        return sockdes;
+}
+
+void bind_or_die(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
+{
+        if (-1 == bind(sockfd, addr, addrlen)) {
+                perror("bind()");
+                exit(EXIT_FAILURE);
+        }
+}
+
+void listen_or_die(int sockfd, int backlog)
+{
+        if (-1 == listen(sockfd, backlog)) {
+                perror("listen()");
+                exit(EXIT_FAILURE);
+        }
+}

@@ -72,7 +72,7 @@ void procwatch(const char *const cfgname)
                 pw_pid_bst_refresh(pw_pid_bst, pw_idle_bst, pwlog);
                 if (true == sig_int_flag) {
                         sig_int_flag = false;
-                        /*make full use of the compund literals*/
+                        /*make full use of the compound literals*/
                         pwlog_write(pwlog,
                                     &((struct pw_pid_info){
                                       .type = INFO_REPORT }));
@@ -262,7 +262,7 @@ static void child_create(FILE *pidof_pipe, struct pw_pid_info *const wpid_info)
 static void process_monitor(int readdes, int writedes)
 {
         /*
-         *For extra safety, block all (except SIGINT and SIGKILL) signals
+         *For extra safety, block all (except SIGSTOP and SIGKILL) signals
          *in case the SIGINT or SIGHUP signal is generated on the controlling
          *terminal; which would send the signal to the whole process group.
          */

@@ -6,6 +6,10 @@
 #include <signal.h>
 #include <unistd.h>
 
+/*For socket() bind()*/
+#include <sys/types.h>
+#include <sys/socket.h>
+
 /*
  *Based on the variadic macro expansion example from
  *https://gcc.gnu.org/onlinedocs/cpp/Variadic-Macros.html
@@ -23,7 +27,16 @@
                 ptr = NULL; \
         } while (0)
 
-enum { PW_LINEBUF_SIZE = 1024 };
+/*
+ *According to part III specification,
+ *"For this assignment, you can safely assume that there will never be more than
+ *32 clients"
+ */
+enum {
+        PW_SERVER_PORT_NUM    = 9898,
+        PW_SERVER_MAX_BACKLOG = 32,
+        PW_LINEBUF_SIZE       = 1024,
+};
 
 void *calloc_or_die(size_t nmemb, size_t size);
 void *realloc_or_die(void *const ptr, size_t size);
@@ -47,4 +60,7 @@ void sigaction_or_die(int sig,
                       const struct sigaction *act,
                       struct sigaction *oldact);
 void sigemptyset_or_die(sigset_t *set);
+int socket_or_die(int domain, int type, int protocol);
+void bind_or_die(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+void listen_or_die(int sockfd, int backlog);
 #endif

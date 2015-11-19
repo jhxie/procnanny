@@ -42,3 +42,14 @@ are widely used in existing code. However, they are now obsolete. (SUSv3 marks
 these functions obsolete, and SUSv4 removes their specifications.) New code
 should use the getaddrinfo() and getnameinfo() functions (described next) for
 such conversions.
+
+On Linux, if select() returns because one or more file descriptors became
+ready, and if timeout was non-NULL, then select() updates the structure to
+which timeout points to indicate how much time remained until the call would
+have timed out. However, this behavior is implementation-specific. SUSv3 also
+allows the possibility that an implementation leaves the structure pointed to
+by timeout unchanged, and most other UNIX implementations don’t modify this
+structure. Portable applications that employ select() within a loop should
+always ensure that the structure pointed to by timeout is initialized before
+each select() call, and should ignore the information returned in the structure
+after the call.

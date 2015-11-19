@@ -232,7 +232,7 @@ static void pw_pid_bst_inorder_add(struct bst_node_ *root)
                 pw_pid_bst_inorder_add(root->link[BST_LEFT]);
 
                 struct pw_pid_info *tmp_ptr = root->memblk;
-		/*from The CERT ® C Coding Standard 2e*/
+                /*from The CERT ® C Coding Standard 2e*/
                 if ((UINT_MAX - interval) < tmp_ptr->pwait_threshold) {
                         tmp_ptr->pwait_threshold = UINT_MAX;
                 } else {
