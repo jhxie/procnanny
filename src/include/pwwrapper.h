@@ -63,4 +63,5 @@ void sigemptyset_or_die(sigset_t *set);
 int socket_or_die(int domain, int type, int protocol);
 void bind_or_die(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 void listen_or_die(int sockfd, int backlog);
+void gethostname_or_die(char *name, size_t len);
 #endif

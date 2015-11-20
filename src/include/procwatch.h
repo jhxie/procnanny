@@ -17,8 +17,9 @@
 
 struct pw_pid_info {
         enum {
-                INFO_INIT, INFO_NOEXIST, INFO_REPORT,
-                INFO_REREAD, ACTION_KILL } type;
+                INFO_STARTUP, INFO_INIT, INFO_NOEXIST,
+                INFO_REPORT, INFO_REREAD, ACTION_KILL
+        } type;
         pid_t watched_pid;
         pid_t child_pid;
         unsigned cwait_threshold;

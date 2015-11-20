@@ -240,3 +240,11 @@ void listen_or_die(int sockfd, int backlog)
                 exit(EXIT_FAILURE);
         }
 }
+
+void gethostname_or_die(char *name, size_t len)
+{
+        if (-1 == gethostname(name, len)) {
+                perror("gethostname()");
+                exit(EXIT_FAILURE);
+        }
+}
