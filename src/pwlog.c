@@ -19,6 +19,34 @@ FILE *pwlog_setup(void)
         return fopen_or_die(pwlog_path, "w");
 }
 
+void pwlog_info(const char *nodename)
+{
+        /*
+         *ASSUMPTION: the length of a line is no more than 1023 characters
+         */
+        char timebuf[PW_LINEBUF_SIZE] = {};
+        time_t epoch_time = time(NULL);
+        struct tm *cal = localtime(&epoch_time);
+        strftime(timebuf, PW_LINEBUF_SIZE, "%a %b %d %T %Z %Y", cal);
+
+        /*Note the constant reserves space for both square brackets*/
+        char *timestr = calloc_or_die(1, strlen(timebuf) + 3);
+        snprintf(timestr, strlen(timebuf) + 3, "[%s]", timebuf);
+        fprintf(stdout,
+                "%s procnanny server: PID %ld on node %s, port %d\n",
+                timestr, (long)getpid(), nodename, PW_SERVER_PORT_NUM);
+        zerofree(timestr);
+
+        const char *const pwinfo_path =
+                secure_getenv_or_die("PROCNANNYSERVERINFO");
+        FILE *const pwinfo = fopen_or_die(pwinfo_path, "w");
+        fprintf(pwinfo,
+                "NODE %s PID %ld PORT %d\n",
+                nodename, (long)getpid(), PW_SERVER_PORT_NUM);
+        fflush(stdout);
+        fflush(pwinfo);
+        fclose_or_die(pwinfo);
+}
 void pwlog_write(FILE *pwlog, struct pw_pid_info *loginfo)
 {
         /*
