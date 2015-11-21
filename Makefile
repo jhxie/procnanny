@@ -1,22 +1,20 @@
-CC         := gcc
-CFLAGS     := -Wall -std=gnu99
-MWFLAGS    := -DMEMWATCH -DMW_STDIO
-INCFLAGS   := -I./src/include
-SRCS       := $(wildcard ./src/*.c)
-SERVERSRCS := ./src/procnanny.server.c ./src/pwwrapper.c
-SERVEROBJS := $(SERVERSRCS:.c=.o)
-CLIENTSRCS := $(filter-out ./src/procnanny.server.c, ./src/castack.c $(SRCS))
-CLIENTOBJS := $(CLIENTSRCS:.c=.o)
-SRCSDIR    := ./src
-BINSDIR    := ./bin
+CC            := gcc
+CFLAGS        := -Wall -std=gnu99
+MWFLAGS       := -DMEMWATCH -DMW_STDIO
+INCFLAGS      := -I./src/include
+SRCSDIR       := ./src
+BINSDIR       := ./bin
+SERVERSRCS    := ./src/procnanny.server.c ./src/pwwrapper.c ./src/memwatch.c
+SERVEROBJS    := $(SERVERSRCS:.c=.o)
+CLIENTSRCS    := ./src/procnanny.client.c
 
-all: $(BINSDIR)/procnanny.server $(BINSDIR)/procnanny.client
+all: $(BINSDIR)/procnanny.server #$(BINSDIR)/procnanny.client
 
 rebuild: clean all
 
-debug: $(BINSDIR)/procnanny.server_debug $(BINSDIR)/procnanny.client_debug
+debug: $(BINSDIR)/procnanny.server_debug #$(BINSDIR)/procnanny.client_debug
 
-rebuild_debug: clean debug
+rebuild_debug: clean #debug
 
 clean:
 	-rm -f $(SRCSDIR)/*.o $(SRCSDIR)/*.gch \
@@ -24,23 +22,24 @@ clean:
 		$(BINSDIR)/{procnanny.server_debug,procnanny.client_debug}
 
 # Server
-$(BINSDIR)/procnanny.server: $(SERVEROBJS)
+$(BINSDIR)/procnanny.server : server_objs
 	@mkdir -p $(BINSDIR)
 	$(CC) $(CFLAGS) $(SERVEROBJS) -o $@
 
-$(SERVEROBJS): $(SERVERSRCS)
+server_objs : $(SERVERSRCS)
+	-rm -f $(SERVEROBJS)
 	$(CC) $(CFLAGS) $(MWFLAGS) $(INCFLAGS) -c $^ -O2
 	-mv *.o $(SRCSDIR)
 
-$(BINSDIR)/procnanny.server_debug: server_debug
+$(BINSDIR)/procnanny.server_debug : server_debug_objs
 	@mkdir -p $(BINSDIR)
 	$(CC) $(CFLAGS) $(SERVEROBJS) -o $@
 
-server_debug: $(SERVERSRCS)
-	$(CC) $(CFLAGS) $(MWFLAGS) $(INCFLAGS) -c $^ -g3 -O0
+server_debug_objs : $(SERVERSRCS)
+	-rm -f $(SERVEROBJS)
+	$(CC) $(CFLAGS) $(MWFLAGS) $(INCFLAGS) -c $^ -ggdb3 -O0
 	-mv *.o $(SRCSDIR)
 
-# Server
-
-.PHONY: all rebuild debug rebuild_debug clean
+.PHONY: all rebuild debug rebuild_debug clean \
+	server_objs server_debug_objs
 .IGNORE:
