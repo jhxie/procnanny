@@ -22,9 +22,9 @@
 #include "pwlog.h"
 #include "pwwrapper.h"
 
-#define PW_ONLY
-#include "pwutils.h"
-#undef PW_ONLY
+#define PWCLIENT_ONLY
+#include "pwcutils.h"
+#undef PWCLIENT_ONLY
 
 #include "memwatch.h"
 
@@ -88,33 +88,6 @@ void procwatch(const char *const cfgname)
         }
 
         fclose_or_die(pwlog);
-}
-
-static void procclean(void)
-{
-        /*
-         *ASSUMPTION: the length of a line is no more than 1023 characters
-         */
-        FILE *clean_pipe              =
-                popen_or_die("pidof -x procnanny | tr \' \' \'\n\'", "r");
-        char linebuf[PW_LINEBUF_SIZE] = {};
-        char *endptr                  = NULL;
-        const pid_t pw_id             = getpid();
-        uintmax_t zombie_id           = 0;
-        errno                         = 0;
-
-        while (NULL != fgets(linebuf, sizeof linebuf, clean_pipe)) {
-                zombie_id = strtoumax(linebuf, &endptr, 10);
-
-                if (pw_id == (pid_t)zombie_id)
-                        continue;
-
-                if (0 != kill((pid_t)zombie_id, SIGKILL)) {
-                        perror("kill()");
-                        exit(EXIT_FAILURE);
-                }
-        }
-        pclose_or_die(clean_pipe);
 }
 
 static void work_dispatch(const struct pw_cfg_info *const cfginfo)
@@ -368,18 +341,6 @@ static FILE *pidof_popenr(const char *const process_name)
         zerofree(cmd_buffer);
 
         return pidof_pipe;
-}
-
-static void signal_handle(int sig)
-{
-        switch (sig) {
-        case SIGHUP:
-                sig_hup_flag = true;
-                break;
-        case SIGINT:
-                sig_int_flag = true;
-                break;
-        }
 }
 
 static void clean_up(void)

@@ -38,6 +38,7 @@ enum {
         PW_LINEBUF_SIZE       = 1024,
 };
 
+void procclean(void);
 void *calloc_or_die(size_t nmemb, size_t size);
 void *realloc_or_die(void *const ptr, size_t size);
 FILE *fopen_or_die(const char *path, const char *mode);

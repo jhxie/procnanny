@@ -4,7 +4,8 @@ MWFLAGS       := -DMEMWATCH -DMW_STDIO
 INCFLAGS      := -I./src/include
 SRCSDIR       := ./src
 BINSDIR       := ./bin
-SERVERSRCS    := ./src/procnanny.server.c ./src/pwwrapper.c ./src/memwatch.c
+SERVERSRCS    := ./src/procnanny.server.c ./src/cfgparser.c ./src/pwwrapper.c \
+		./src/pwlog.c ./src/memwatch.c
 SERVEROBJS    := $(SERVERSRCS:.c=.o)
 CLIENTSRCS    := ./src/procnanny.client.c
 
@@ -39,6 +40,7 @@ server_debug_objs : $(SERVERSRCS)
 	-rm -f $(SERVEROBJS)
 	$(CC) $(CFLAGS) $(MWFLAGS) $(INCFLAGS) -c $^ -ggdb3 -O0
 	-mv *.o $(SRCSDIR)
+# Server
 
 .PHONY: all rebuild debug rebuild_debug clean \
 	server_objs server_debug_objs

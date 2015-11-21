@@ -9,8 +9,11 @@
 #endif
 
 #include <err.h>
+#include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -21,6 +24,35 @@
 #include "pwwrapper.h"
 
 #include "memwatch.h"
+
+void procclean(void)
+{
+        /*
+         *ASSUMPTION: the length of a line is no more than 1023 characters
+         */
+        static const char *const clean_pipe_str =
+                "pidof -x procnanny.server procnanny.client | "
+                "tr \' \' \'\n\'";
+        FILE *clean_pipe              = popen_or_die(clean_pipe_str, "r");
+        char linebuf[PW_LINEBUF_SIZE] = {};
+        char *endptr                  = NULL;
+        const pid_t pw_id             = getpid();
+        uintmax_t zombie_id           = 0;
+        errno                         = 0;
+
+        while (NULL != fgets(linebuf, sizeof linebuf, clean_pipe)) {
+                zombie_id = strtoumax(linebuf, &endptr, 10);
+
+                if (pw_id == (pid_t)zombie_id)
+                        continue;
+
+                if (0 != kill((pid_t)zombie_id, SIGKILL)) {
+                        perror("kill()");
+                        exit(EXIT_FAILURE);
+                }
+        }
+        pclose_or_die(clean_pipe);
+}
 
 void *calloc_or_die(size_t nmemb, size_t size)
 {

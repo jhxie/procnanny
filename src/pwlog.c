@@ -20,7 +20,17 @@ FILE *pwlog_setup(void)
         return fopen_or_die(pwlog_path, "w");
 }
 
-FILE *pwlog_info(void)
+/*
+ *According to the assignment specification:
+ *"
+ *When the server process nanny starts up, it must output its PID, the name of
+ *the workstation it is running on, and the port number used by the server to
+ *accept new socket connections.
+ *Also, the procnanny.server process must print to a file, specified via
+ *environment variable PROCNANNYSERVERINFO, with a single line of text output
+ *"
+ */
+static FILE *pwlog_info(void)
 {
         const char *const pwinfo_path =
                 secure_getenv_or_die("PROCNANNYSERVERINFO");
@@ -34,6 +44,7 @@ void pwlog_write(FILE *pwlog, struct pw_pid_info *loginfo)
          *ASSUMPTION: the length of a line is no more than 1023 characters
          */
         char hostname[HOST_NAME_MAX + 1] = { 0 };
+        FILE *pwinfo = NULL;
         /*
          *POSIX.1 guarantees that "Host names (not including the terminating
          *null byte) are limited to HOST_NAME_MAX  bytes"
@@ -48,11 +59,10 @@ void pwlog_write(FILE *pwlog, struct pw_pid_info *loginfo)
         /*Note the constant reserves space for both square brackets*/
         char *timestr = calloc_or_die(1, strlen(timebuf) + 3);
         snprintf(timestr, strlen(timebuf) + 3, "[%s]", timebuf);
-        /*Print the time field only when the type of pw_pid_info
-         *is NOT INFO_STARTUP
-         */
-        if (INFO_STARTUP != loginfo->type) {
-                fputs_or_die(timestr, pwlog);
+        /*Print the time field only*/
+        fputs_or_die(timestr, pwlog);
+        if (INFO_STARTUP == loginfo->type) {
+                pwinfo = pwlog_info();
         }
 
         /*
@@ -62,12 +72,12 @@ void pwlog_write(FILE *pwlog, struct pw_pid_info *loginfo)
         switch (loginfo->type) {
 
         case INFO_STARTUP:
-                fprintf(pwlog,
+                fprintf(pwinfo,
                         "NODE %s PID %ld PORT %d\n",
                         hostname, (long)getpid(), PW_SERVER_PORT_NUM);
-                fprintf(stdout,
-                        "%s procnanny server: PID %ld on node %s, port %d\n",
-                        timestr, (long)getpid(), hostname, PW_SERVER_PORT_NUM);
+                fprintf(pwlog,
+                        " procnanny server: PID %ld on node %s, port %d\n",
+                        (long)getpid(), hostname, PW_SERVER_PORT_NUM);
                 break;
         case INFO_INIT:
                 fprintf(pwlog,
@@ -109,6 +119,11 @@ void pwlog_write(FILE *pwlog, struct pw_pid_info *loginfo)
                         loginfo->process_name,
                         loginfo->cwait_threshold);
                 break;
+        }
+
+        if (NULL != pwinfo) {
+                fflush(pwinfo);
+                fclose_or_die(pwinfo);
         }
         zerofree(timestr);
         fflush(stdout);
