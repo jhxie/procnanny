@@ -4,8 +4,8 @@ MWFLAGS       := -DMEMWATCH -DMW_STDIO
 INCFLAGS      := -I./src/include
 SRCSDIR       := ./src
 BINSDIR       := ./bin
-SERVERSRCS    := ./src/procnanny.server.c ./src/cfgparser.c ./src/pwwrapper.c \
-		./src/pwlog.c ./src/memwatch.c
+SERVERSRCS    := ./src/procnanny.server.c ./src/bst.c ./src/cfgparser.c \
+		./src/pwlog.c ./src/pwwrapper.c ./src/memwatch.c
 SERVEROBJS    := $(SERVERSRCS:.c=.o)
 CLIENTSRCS    := ./src/procnanny.client.c
 

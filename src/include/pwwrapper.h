@@ -39,6 +39,10 @@ enum {
 };
 
 void procclean(void);
+void data_write(int fd, const void *buf, size_t n);
+void data_read(int fd, void *buf, size_t n);
+
+      /*Below are all wrapper functions for certain library/system calls*/
 void *calloc_or_die(size_t nmemb, size_t size);
 void *realloc_or_die(void *const ptr, size_t size);
 FILE *fopen_or_die(const char *path, const char *mode);
@@ -65,4 +69,9 @@ int socket_or_die(int domain, int type, int protocol);
 void bind_or_die(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 void listen_or_die(int sockfd, int backlog);
 void gethostname_or_die(char *name, size_t len);
+void getnameinfo_or_die(const struct sockaddr *sa, socklen_t salen,
+			char *host, socklen_t hostlen,
+			char *serv, socklen_t servlen,
+			int flags);
+      /*Above are all wrapper functions for certain library/system calls*/
 #endif

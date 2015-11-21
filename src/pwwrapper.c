@@ -12,10 +12,12 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <netdb.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -52,6 +54,38 @@ void procclean(void)
                 }
         }
         pclose_or_die(clean_pipe);
+}
+
+/*
+ *Based on the "BSD Sockets: A Quick And Dirty Primer" by Jim Frost
+ */
+void data_write(int fd, const void *buf, size_t n)
+{
+        size_t bcount = 0; /* counts bytes write */
+        size_t br     = 0; /* bytes write this pass */
+        /* loop until full buffer */
+        while (bcount < n) {
+                if (0 < (br = write_or_die(fd, buf, n - bcount))) {
+                        bcount += br; /* increment byte counter */
+                        buf += br; /* move buffer ptr for next write */
+                }
+        }
+}
+
+/*
+ *Based on the "BSD Sockets: A Quick And Dirty Primer" by Jim Frost
+ */
+void data_read(int fd, void *buf, size_t n)
+{
+        size_t bcount = 0; /* counts bytes write */
+        size_t br     = 0; /* bytes write this pass */
+        /* loop until full buffer */
+        while (bcount < n) {
+                if (0 < (br = read_or_die(fd, buf, n - bcount))) {
+                        bcount += br; /* increment byte counter */
+                        buf += br; /* move buffer ptr for next write */
+                }
+        }
 }
 
 void *calloc_or_die(size_t nmemb, size_t size)
@@ -278,5 +312,16 @@ void gethostname_or_die(char *name, size_t len)
         if (-1 == gethostname(name, len)) {
                 perror("gethostname()");
                 exit(EXIT_FAILURE);
+        }
+}
+
+void getnameinfo_or_die(const struct sockaddr *sa, socklen_t salen,
+			char *host, socklen_t hostlen,
+			char *serv, socklen_t servlen,
+			int flags)
+{
+        int ecode = getnameinfo(sa, salen, host, hostlen, serv, servlen, flags);
+        if (0 != ecode) {
+                errx(EXIT_FAILURE, "getnameinfo(): %s", gai_strerror(ecode));
         }
 }
