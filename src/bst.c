@@ -92,7 +92,7 @@ void *bst_add(struct bst *current_bst, long key, size_t blknum, size_t blksize)
 
         struct bst_node_ *bstnode = calloc_or_die(1, sizeof(struct bst_node_));
 
-        if (current_bst->numnode + 1 == SIZE_MAX) {
+        if (SIZE_MAX == current_bst->numnode) {
 #ifdef BST_DEBUG
                 const char *const err_msg = "bst: max node count reached\n";
                 write(STDERR_FILENO, err_msg, strlen(err_msg));
@@ -102,10 +102,10 @@ void *bst_add(struct bst *current_bst, long key, size_t blknum, size_t blksize)
                 return NULL;
         }
 
-        bstnode->key                        = key;
-        bstnode->memblk                     = calloc_or_die(blknum, blksize);
-        bstnode->blknum                     = blknum;
-        bstnode->blksize                    = blksize;
+        bstnode->key             = key;
+        bstnode->memblk          = calloc_or_die(blknum, blksize);
+        bstnode->blknum          = blknum;
+        bstnode->blksize         = blksize;
         /*again, redundant*/
         bstnode->link[BST_LEFT]  = NULL;
         bstnode->link[BST_RIGHT] = NULL;
@@ -191,7 +191,7 @@ int bst_del(struct bst *current_bst, long key)
         return 0;
 }
 
-int bst_destroy(struct bst **current_bst)
+int bst_destroy(struct bst **current_bst, enum bst_type type)
 {
         if (NULL == current_bst || NULL == *current_bst) {
                 errno = EINVAL;
@@ -199,6 +199,7 @@ int bst_destroy(struct bst **current_bst)
         }
 
         struct pw_pid_info *pid_info_ptr;
+        struct pw_idle_info *idle_info_ptr;
         struct bst_node_ *tmp_ptr = (*current_bst)->root;
         struct bst_node_ *saveptr;
         char writebuf[PW_CHILD_READ_SIZE] = {};
@@ -214,12 +215,31 @@ int bst_destroy(struct bst **current_bst)
                         saveptr->link[BST_RIGHT] = tmp_ptr;
                 } else {
                         saveptr = tmp_ptr->link[BST_RIGHT];
-                        pid_info_ptr = tmp_ptr->memblk;
-                        close(pid_info_ptr->ipc_fdes[0]);
-                        tmp = write(pid_info_ptr->ipc_fdes[1],
-                                    writebuf,
-                                    PW_CHILD_READ_SIZE);
-                        close(pid_info_ptr->ipc_fdes[1]);
+
+                        switch (type) {
+                        case PW_PID_BST:
+                                pid_info_ptr = tmp_ptr->memblk;
+                                close(pid_info_ptr->ipc_fdes[0]);
+                                tmp = write(pid_info_ptr->ipc_fdes[1],
+                                            writebuf,
+                                            PW_CHILD_READ_SIZE);
+                                close(pid_info_ptr->ipc_fdes[1]);
+                                break;
+                        case PW_IDLE_BST:
+                                idle_info_ptr = tmp_ptr->memblk;
+                                close(idle_info_ptr->ipc_fdes[0]);
+                                tmp = write(idle_info_ptr->ipc_fdes[1],
+                                            writebuf,
+                                            PW_CHILD_READ_SIZE);
+                                close(idle_info_ptr->ipc_fdes[1]);
+                                break;
+                        case PW_CLIENT_BST:
+                                /*
+                                 *the client case has already been taken care
+                                 *of by pw_client_bst_report_helper()
+                                 */
+                                break;
+                        }
                         free(tmp_ptr->memblk);
                         free(tmp_ptr);
                 }

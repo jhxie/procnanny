@@ -112,8 +112,8 @@ static void procwatch(const int server_sockfd)
         pw_idle_bst = bst_init();
 
         if (0 != atexit(clean_up)) {
-                bst_destroy(&pw_pid_bst);
-                bst_destroy(&pw_idle_bst);
+                bst_destroy(&pw_pid_bst, (enum bst_type)PW_PID_BST);
+                bst_destroy(&pw_idle_bst, (enum bst_type)PW_IDLE_BST);
                 errx(EXIT_FAILURE, "atexit() : failed to register clean_up()");
         }
 
@@ -403,6 +403,6 @@ static FILE *pidof_popenr(const char *const process_name)
 
 static void clean_up(void)
 {
-        bst_destroy(&pw_pid_bst);
-        bst_destroy(&pw_idle_bst);
+        bst_destroy(&pw_pid_bst, (enum bst_type)PW_PID_BST);
+        bst_destroy(&pw_idle_bst, (enum bst_type)PW_IDLE_BST);
 }

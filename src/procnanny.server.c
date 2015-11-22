@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
         pw_client_bst = bst_init();
 
         if (0 != atexit(clean_up)) {
-                bst_destroy(&pw_client_bst);
+                bst_destroy(&pw_client_bst, (enum bst_type)PW_CLIENT_BST);
                 errx(EXIT_FAILURE, "atexit() : failed to register clean_up()");
         }
 
@@ -166,7 +166,7 @@ static void clients_serve(const int listen_sockfd,
                         1,
                         sizeof(struct pw_client_info));
         getnameinfo_or_die((struct sockaddr *)&client_sockaddr, client_socklen,
-                           client_ptr->hostname, sizeof client_ptr->hostname,
+                           client_ptr->hostname, NI_MAXHOST,
                            NULL, 0, NI_NAMEREQD);
         client_ptr->sockfd  = client_sockfd;
         client_ptr->killcnt = 0;
@@ -192,5 +192,5 @@ static void signal_handle(int sig)
 
 static void clean_up(void)
 {
-        bst_destroy(&pw_client_bst);
+        bst_destroy(&pw_client_bst, (enum bst_type)PW_CLIENT_BST);
 }
