@@ -120,7 +120,7 @@ void pwlog_write(FILE *pwlog, struct pw_pid_info *loginfo, const char *chost)
                         (long)loginfo->watched_pid,
                         loginfo->process_name,
                         chost,
-                        loginfo->cwait_threshold);
+                        loginfo->wait_threshold);
                 break;
         }
 

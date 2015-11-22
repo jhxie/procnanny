@@ -19,6 +19,11 @@
 #include <unistd.h>
 
 #include "bst.h"
+/*
+ *Note even though the cfgparser header is used, the client code
+ *does not link to cfgparser object file because client is NEVER
+ *expected to parse any configuration files by itself.
+ */
 #include "cfgparser.h"
 #include "procclient.h"
 #include "pwversion.h"
@@ -30,10 +35,14 @@
 
 #include "memwatch.h"
 
+static bool cfg_resent         = true;
+static int server_sockfd       = 0;
 /*pw_pid_bst is used for storing struct pw_pid_info*/
-static struct bst *pw_pid_bst             = NULL;
+static struct bst *pw_pid_bst  = NULL;
 /*pw_idle_bst is used for storing the info of idle children*/
-static struct bst *pw_idle_bst            = NULL;
+static struct bst *pw_idle_bst = NULL;
+/*client_cfg_vector is used as a local storage for the received configuration*/
+static struct pw_cfg_info client_cfg_vector[PW_CFG_MAX_NUM_PROGRAM_NAME];
 
 int main(int argc, char *argv[])
 {
@@ -66,7 +75,6 @@ int main(int argc, char *argv[])
         };
         struct addrinfo *host_list      = NULL;
         struct addrinfo *host_list_iter = NULL;
-        int server_sockfd;
         int gai_return_val = getaddrinfo(argv[1], argv[2],
                                          &server_info, &host_list);
         if (0 != gai_return_val) {
@@ -106,8 +114,15 @@ int main(int argc, char *argv[])
         return EXIT_SUCCESS;
 }
 
-static void procwatch(const int server_sockfd)
+static void procwatch(void)
 {
+        /*
+         *Initialize the file descriptor set to contain the
+         *socket descriptor of server
+         */
+        fd_set chkset;
+        FD_ZERO(&chkset);
+        FD_SET(server_sockfd, &chkset);
         pw_pid_bst = bst_init();
         pw_idle_bst = bst_init();
 
@@ -117,24 +132,27 @@ static void procwatch(const int server_sockfd)
                 errx(EXIT_FAILURE, "atexit() : failed to register clean_up()");
         }
 
-        pwlog = pwlog_setup();
-        size_t numcfgline = config_parse(cfgname);
         /*
-        struct sigaction sa = {
-                .sa_handler = signal_handle,
-                .sa_flags = SA_RESTART,
-        };
-        sigemptyset_or_die(&sa.sa_mask);
-        sigaction_or_die(SIGINT, &sa, NULL);
-        sigaction_or_die(SIGHUP, &sa, NULL);
-        */
-        
+         *For the 1st time the client read the configuration file,
+         *it is possible the data_read would cause the client to
+         *be blocked (network delay, etc), this case is IGNORED.
+         */
+        data_read(server_sockfd, client_cfg_vector, sizeof client_cfg_vector);
+
         while (true) {
-                for (size_t i = 0; i < numcfgline; ++i) {
-                        work_dispatch(&pw_cfg_vector[i]);
+                for (struct pw_cfg_info *cfg_iterator = client_cfg_vector;
+                     '\0' != cfg_iterator->process_name[0] &&
+                     0 != cfg_iterator->wait_threshold;
+                     ++cfg_iterator) {
+                        work_dispatch(cfg_iterator, &chkset);
                 }
+                /*
+                 *for (size_t i = 0; i < numcfgline; ++i) {
+                 *        work_dispatch(&pw_cfg_vector[i]);
+                 *}
+                 */
                 sleep(5U);
-                pw_pid_bst_interval_add(pw_pid_bst, 5U);
+                /*pw_pid_bst_interval_add(pw_pid_bst, 5U);*/
                 pw_pid_bst_refresh(pw_pid_bst, pw_idle_bst, pwlog);
                 if (true == sig_int_flag) {
                         sig_int_flag = false;
@@ -146,6 +164,7 @@ static void procwatch(const int server_sockfd)
                 }
                 if (true == sig_hup_flag) {
                         sig_hup_flag = false;
+                        cfg_resent = true;
                         numcfgline = config_parse(cfgname);
                         pwlog_write(pwlog,
                                     &((struct pw_pid_info){
@@ -156,7 +175,7 @@ static void procwatch(const int server_sockfd)
         fclose_or_die(pwlog);
 }
 
-static void work_dispatch(const struct pw_cfg_info *const cfginfo)
+static void work_dispatch(const struct pw_cfg_info *cfginfo, fd_set *chkset)
 {
         bool process_not_found = true;
         char linebuf[PW_LINEBUF_SIZE] = {};
@@ -165,8 +184,7 @@ static void work_dispatch(const struct pw_cfg_info *const cfginfo)
         struct pw_pid_info wpid_info = {
                 .child_pid       = 0,
                 .watched_pid     = 0,
-                .cwait_threshold = cfginfo->wait_threshold,
-                .pwait_threshold = 0,
+                .wait_threshold = cfginfo->wait_threshold,
         };
         strcpy(wpid_info.process_name, cfginfo->process_name);
         struct pw_idle_info *idle_info_ptr;
@@ -193,15 +211,22 @@ static void work_dispatch(const struct pw_cfg_info *const cfginfo)
                 } else {
                         child_create(pidof_pipe, &wpid_info);
                 }
-                /*Parent write INFO_INIT log*/
+                /*Parent pass the INFO_INIT log to server*/
                 wpid_info.type = INFO_INIT;
-                pwlog_write(pwlog, &wpid_info);
+                data_write(server_sockfd, &wpid_info, sizeof wpid_info);
+                /*pwlog_write(pwlog, &wpid_info);*/
                 parent_msg_write(&wpid_info);
         }
-        if (true == process_not_found) {
-                /*Parent write INFO_NOEXIST log*/
+        if (true == process_not_found && true == cfg_resent) {
+                /*
+                 *Parent pass the INFO_NOEXIST log to server and make sure that
+                 *the INFO_NOEXIST only passes back upon configuration resend
+                 *(a.k.a SIGHUP received at server side)
+                 */
+                cfg_resent = false;
                 wpid_info.type = INFO_NOEXIST;
-                pwlog_write(pwlog, &wpid_info);
+                data_write(server_sockfd, &wpid_info, sizeof wpid_info);
+                /*pwlog_write(pwlog, &wpid_info);*/
         }
         pclose_or_die(pidof_pipe);
 }
@@ -238,7 +263,7 @@ static void parent_msg_write(struct pw_pid_info *const wpid_info)
         unsigned *unsigned_ptr = (unsigned *)(pid_ptr + 1);
 
         *pid_ptr = wpid_info->watched_pid;
-        *unsigned_ptr = wpid_info->cwait_threshold;
+        *unsigned_ptr = wpid_info->wait_threshold;
         write_or_die(wpid_info->ipc_fdes[1],
                      writebuf,
                      PW_CHILD_READ_SIZE);
@@ -284,7 +309,7 @@ static void child_create(FILE *pidof_pipe, struct pw_pid_info *const wpid_info)
         switch (wpid_info->child_pid) {
         case 0:
                 pclose(pidof_pipe);
-                fclose_or_die(pwlog);
+                /*fclose_or_die(pwlog);*/
                 close_or_die(tmp_fdes1[0]);
                 close_or_die(tmp_fdes2[1]);
                 process_monitor(tmp_fdes2[0], tmp_fdes1[1]);

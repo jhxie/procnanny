@@ -45,8 +45,7 @@ struct pw_pid_info {
         } type;
         pid_t watched_pid;
         pid_t child_pid;
-        unsigned cwait_threshold;
-        unsigned pwait_threshold;
+        unsigned wait_threshold;
         char process_name[PW_LINEBUF_SIZE];
         int ipc_fdes[2];
 };

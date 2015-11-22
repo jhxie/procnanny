@@ -40,3 +40,5 @@ TA Name:             Luke Nitish Kumar
 5.The size of deletion queue is assumed to be 1024 at maximum; this queue is
   used for storing information about deletion of the pw\_pid\_info structure
   upon the success/failure of a monitored process.
+
+6.The server and clients cannot crash or be killed.
