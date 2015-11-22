@@ -7,5 +7,5 @@
 #include "procwatch.h"
 
 FILE *pwlog_setup(void) __attribute__((warn_unused_result));
-void pwlog_write(FILE *pwlog, struct pw_pid_info *loginfo);
+void pwlog_write(FILE *pwlog, struct pw_pid_info *loginfo, const char *chost);
 #endif

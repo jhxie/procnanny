@@ -11,6 +11,7 @@
 
 #include "bst.h"
 #include "cfgparser.h"
+#include "procwatch.h"
 #include "pwlog.h"
 #include "pwwrapper.h"
 
@@ -71,24 +72,26 @@ static void procserver(void)
 
         /*Write to the environment variable PROCNANNYSERVERINFO*/
         pwlog_write(pwlog, &((struct pw_pid_info){
-                             .type = INFO_STARTUP}));
+                             .type = INFO_STARTUP}), NULL);
         bind_or_die(listen_sockfd,
                     (struct sockaddr *)&server_sockaddr,
                     sizeof server_sockaddr);
         listen_or_die(listen_sockfd, PW_SERVER_MAX_BACKLOG);
 
-        for (fd_set tmpset = readset; true;
-             client_socklen = sizeof client_sockaddr) {
-
-                client_sockfd = accept(listen_sockfd,
-                                   (struct sockaddr *)&client_sockaddr,
-                                   &client_socklen);
-                if (0 > client_sockfd) {
-                        perror("accept()");
-                        exit(EXIT_FAILURE);
+        while (true) {
+                fdset_check(listen_sockfd, &readset);
+                if (true == sig_int_flag) {
+                        sig_int_flag = false;
+                        pw_client_bst_report(pw_client_bst, pwlog);
+                        break;
                 }
-                /*write_or_die(client_sockfd, &MAGIC, sizeof MAGIC);*/
+                if (true == sig_hup_flag) {
+                        sig_hup_flag = false;
+                        numcfgline = config_parse(configname);
+                        pw_client_bst_batchsend(pw_client_bst, pwlog);
+                }
         }
+
         close_or_die(listen_sockfd);
         fclose_or_die(pwlog);
 }
@@ -136,7 +139,7 @@ static void fdset_check(const int listen_sockfd, fd_set *readset)
                         FD_CLR(listen_sockfd, &tmpset);
                         numdes--;
                 }
-                batchlog_write(numdes, &tmpset);
+                pw_client_bst_batchlog(pw_client_bst, &tmpset, pwlog);
         }
 }
 
@@ -166,10 +169,6 @@ static void clients_serve(const int listen_sockfd, fd_set *readset)
         data_write(client_sockfd, pw_cfg_vector, sizeof pw_cfg_vector);
 }
 
-
-static void batchlog_write(const int totnumdes, const fd_set *clientset)
-{
-}
 static void signal_handle(int sig)
 {
         switch (sig) {

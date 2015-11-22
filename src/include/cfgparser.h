@@ -3,20 +3,15 @@
 
 #include "pwlog.h"
 
-/*
- *Based on ASSUMPTION #4
- */
-enum { PW_CFG_MAX_LEN_PROGRAM_NAME = 1024 };
+enum {
+        PW_CFG_MAX_LEN_PROGRAM_NAME = 1024, /*Based on assumption 4*/
+        PW_CFG_MAX_NUM_PROGRAM_NAME = 128 /*From assignment specification*/
+};
 
 struct pw_cfg_info {
         char process_name[PW_CFG_MAX_LEN_PROGRAM_NAME];
         unsigned wait_threshold;
 };
-
-/*
- *From the assignment specification
- */
-enum { PW_CFG_MAX_NUM_PROGRAM_NAME = 128 };
 
 extern struct pw_cfg_info pw_cfg_vector[PW_CFG_MAX_NUM_PROGRAM_NAME];
 

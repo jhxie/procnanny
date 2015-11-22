@@ -1,8 +1,14 @@
 #ifndef PROCWATCH_H_
 #define PROCWATCH_H_
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 #include "pwwrapper.h"
 
@@ -14,6 +20,12 @@
  *a enumerator)
  */
 #define PW_CHILD_READ_SIZE ((ssize_t)(sizeof(pid_t) + sizeof(unsigned)))
+
+struct pw_client_info {
+        int  sockfd;
+        char hostname[NI_MAXHOST];
+        size_t killcnt;
+};
 
 struct pw_pid_info {
         enum {

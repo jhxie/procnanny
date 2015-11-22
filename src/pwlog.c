@@ -15,7 +15,7 @@
 
 FILE *pwlog_setup(void)
 {
-        const char *const pwlog_path =secure_getenv_or_die("PROCNANNYLOGS");
+        const char *const pwlog_path = secure_getenv_or_die("PROCNANNYLOGS");
 
         return fopen_or_die(pwlog_path, "w");
 }
@@ -38,18 +38,18 @@ static FILE *pwlog_info(void)
         return fopen_or_die(pwinfo_path, "w");
 }
 
-void pwlog_write(FILE *pwlog, struct pw_pid_info *loginfo)
+void pwlog_write(FILE *pwlog, struct pw_pid_info *loginfo, const char *chost)
 {
         /*
          *ASSUMPTION: the length of a line is no more than 1023 characters
          */
-        char hostname[HOST_NAME_MAX + 1] = { 0 };
+        char shost[HOST_NAME_MAX + 1] = { 0 };
         FILE *pwinfo = NULL;
         /*
          *POSIX.1 guarantees that "Host names (not including the terminating
          *null byte) are limited to HOST_NAME_MAX  bytes"
          */
-        gethostname_or_die(hostname, HOST_NAME_MAX + 1);
+        gethostname_or_die(shost, HOST_NAME_MAX + 1);
 
         char timebuf[PW_LINEBUF_SIZE]       = { 0 };
         time_t epoch_time = time(NULL);
@@ -74,20 +74,22 @@ void pwlog_write(FILE *pwlog, struct pw_pid_info *loginfo)
         case INFO_STARTUP:
                 fprintf(pwinfo,
                         "NODE %s PID %ld PORT %d\n",
-                        hostname, (long)getpid(), PW_SERVER_PORT_NUM);
+                        shost, (long)getpid(), PW_SERVER_PORT_NUM);
                 fprintf(pwlog,
                         " procnanny server: PID %ld on node %s, port %d\n",
-                        (long)getpid(), hostname, PW_SERVER_PORT_NUM);
+                        (long)getpid(), shost, PW_SERVER_PORT_NUM);
                 break;
         case INFO_INIT:
                 fprintf(pwlog,
                         " Info: Initializing monitoring of "
                         "process \'%s\' (PID %ld) on node %s.\n",
-                        loginfo->process_name, (long)loginfo->watched_pid);
+                        loginfo->process_name,
+                        (long)loginfo->watched_pid,
+                        chost);
                 break;
         case INFO_NOEXIST:
                 fprintf(pwlog, " Info: No \'%s\' processes found on %s.\n",
-                        loginfo->process_name);
+                        loginfo->process_name, chost);
                 break;
         case INFO_REPORT:
                 fprintf(pwlog,
@@ -117,6 +119,7 @@ void pwlog_write(FILE *pwlog, struct pw_pid_info *loginfo)
                         "after exceeding %u seconds.\n",
                         (long)loginfo->watched_pid,
                         loginfo->process_name,
+                        chost,
                         loginfo->cwait_threshold);
                 break;
         }
