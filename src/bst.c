@@ -32,6 +32,7 @@ static unsigned interval               = 0;
 static struct bst *idle_bst            = NULL;
 static const fd_set *clientset         = NULL;
 static FILE *logfile                   = NULL;
+static size_t numlines                 = 0;
 
 struct bst_node_ {
         long key;
@@ -372,7 +373,7 @@ static void pw_client_bst_report_helper(struct bst_node_ *root)
         fprintf(logfile, "%s ", client_info_ptr->hostname);
         fprintf(stdout, "%s ", client_info_ptr->hostname);
         /*Notify the clients to quit*/
-        data_write((int)root->key, pw_cfg_vector, sizeof pw_cfg_vector);
+        data_write((int)root->key, pw_cfg_vector, sizeof(struct pw_cfg_info));
         /*Close the connection*/
         close((int)root->key);
         pw_client_bst_report_helper(root->link[BST_RIGHT]);
@@ -393,7 +394,11 @@ int pw_client_bst_report(struct bst *pw_client_bst, FILE *pwlog)
         logfile = pwlog;
         pwlog_write(logfile, &((struct pw_pid_info){
                                .type = INFO_REPORT }), NULL);
-        memset(pw_cfg_vector[0].process_name,'\0',PW_CFG_MAX_LEN_PROGRAM_NAME);
+        /*
+         *Set the first structure within pw_cfg_vector to a special value
+         *to be sent to all the clients
+         */
+        memset(pw_cfg_vector, 0, sizeof(struct pw_cfg_info));
         pw_client_bst_report_helper(pw_client_bst->root);
         fprintf(logfile, "\n");
         fprintf(stdout, "\n");
@@ -408,17 +413,24 @@ static void pw_client_bst_batchsend_helper(struct bst_node_ *root)
                 return;
 
         pw_client_bst_batchlog_helper(root->link[BST_LEFT]);
-        data_write((int)root->key, pw_cfg_vector, sizeof pw_cfg_vector);
+        for (size_t i = 0; i < numlines; ++i) {
+                data_write((int)root->key,
+                           &pw_cfg_vector[i],
+                           sizeof(struct pw_cfg_info));
+        }
         pw_client_bst_batchlog_helper(root->link[BST_RIGHT]);
 }
 
-int pw_client_bst_batchsend(struct bst *pw_client_bst, FILE *pwlog)
+int pw_client_bst_batchsend(struct bst *pw_client_bst,
+                            FILE *pwlog,
+                            const size_t numcfgline)
 {
         if (NULL == pw_client_bst) {
                 errno = EINVAL;
                 return -1;
         }
-        logfile = pwlog;
+        logfile  = pwlog;
+        numlines = numcfgline;
         /*
          *Print the SIGHUP info and then resend the pw_cfg_vector
          *for each client.

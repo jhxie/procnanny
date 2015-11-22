@@ -16,6 +16,4 @@ struct pw_idle_info {
         int ipc_fdes[2];
 };
 
-void procwatch(const char *const cfgname);
-
 #endif

@@ -13,6 +13,7 @@
 #include "cfgparser.h"
 #include "procserver.h"
 #include "pwlog.h"
+#include "pwversion.h"
 #include "pwwrapper.h"
 
 #define PWSERVER_ONLY
@@ -70,16 +71,16 @@ static void procserver(void)
         FD_ZERO(&readset);
         FD_SET(listen_sockfd, &readset);
 
-        /*Write to the environment variable PROCNANNYSERVERINFO*/
-        pwlog_write(pwlog, &((struct pw_pid_info){
-                             .type = INFO_STARTUP}), NULL);
         bind_or_die(listen_sockfd,
                     (struct sockaddr *)&server_sockaddr,
                     sizeof server_sockaddr);
         listen_or_die(listen_sockfd, PW_SERVER_MAX_BACKLOG);
+        /*Write to the environment variable PROCNANNYSERVERINFO*/
+        pwlog_write(pwlog, &((struct pw_pid_info){
+                             .type = INFO_STARTUP}), NULL);
 
         while (true) {
-                fdset_check(listen_sockfd, &readset);
+                fdset_check(listen_sockfd, &readset, numcfgline);
                 if (true == sig_int_flag) {
                         sig_int_flag = false;
                         pw_client_bst_report(pw_client_bst, pwlog);
@@ -88,7 +89,7 @@ static void procserver(void)
                 if (true == sig_hup_flag) {
                         sig_hup_flag = false;
                         numcfgline = config_parse(configname);
-                        pw_client_bst_batchsend(pw_client_bst, pwlog);
+                        pw_client_bst_batchsend(pw_client_bst,pwlog,numcfgline);
                 }
         }
 
@@ -96,7 +97,9 @@ static void procserver(void)
         fclose_or_die(pwlog);
 }
 
-static void fdset_check(const int listen_sockfd, fd_set *readset)
+static void fdset_check(const int listen_sockfd,
+                        fd_set *readset,
+                        const size_t numcfgline)
 {
         /*
          *This temporary file descriptor set is used to feed pselect():
@@ -123,7 +126,7 @@ static void fdset_check(const int listen_sockfd, fd_set *readset)
                          *Note that readset is ONLY MODIFIED if there is a
                          *new connection queueing to be served.
                          */
-                        clients_serve(listen_sockfd, readset);
+                        clients_serve(listen_sockfd, readset, numcfgline);
                         /*
                          *Return directly if the listening socket is the only
                          *descriptor available for reading:
@@ -143,7 +146,9 @@ static void fdset_check(const int listen_sockfd, fd_set *readset)
         }
 }
 
-static void clients_serve(const int listen_sockfd, fd_set *readset)
+static void clients_serve(const int listen_sockfd,
+                          fd_set *readset,
+                          const size_t numcfgline)
 {
         struct sockaddr_in client_sockaddr = { 0 };
         socklen_t client_socklen = sizeof client_sockaddr;
@@ -166,7 +171,11 @@ static void clients_serve(const int listen_sockfd, fd_set *readset)
         client_ptr->sockfd  = client_sockfd;
         client_ptr->killcnt = 0;
         /*Send the configuration file vector to the newly connected client*/
-        data_write(client_sockfd, pw_cfg_vector, sizeof pw_cfg_vector);
+        for (size_t i = 0; i < numcfgline; ++i) {
+                data_write(client_sockfd,
+                           &pw_cfg_vector[i],
+                           sizeof(struct pw_cfg_info));
+        }
 }
 
 static void signal_handle(int sig)

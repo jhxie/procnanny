@@ -94,12 +94,12 @@ void pwlog_write(FILE *pwlog, struct pw_pid_info *loginfo, const char *chost)
         case INFO_REPORT:
                 fprintf(pwlog,
                         " Info: Caught SIGINT. Exiting cleanly. %zu "
-                        "process(es) killed on ",
+                        "process(es) killed on node(s) ",
                         num_killed);
                 fputs_or_die(timestr, stdout);
                 fprintf(stdout,
                         " Info: Caught SIGINT. Exiting cleanly. %zu "
-                        "process(es) killed on ",
+                        "process(es) killed on node(s) ",
                         num_killed);
                 break;
         case INFO_REREAD:

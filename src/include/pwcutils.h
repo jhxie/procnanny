@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 
+static void procwatch(const int server_sockfd);
 static void work_dispatch(const struct pw_cfg_info *const cfginfo);
 static void parent_msg_write(struct pw_pid_info *const wpid_info);
 static void child_create(FILE *pidof_pipe, struct pw_pid_info *const wpid_info);

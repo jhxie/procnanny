@@ -39,7 +39,9 @@ int pw_client_bst_batchlog(struct bst *pw_client_bst,
                            const fd_set *pw_clientset,
                            FILE *pwlog);
 int pw_client_bst_report(struct bst *pw_client_bst, FILE *pwlog);
-int pw_client_bst_batchsend(struct bst *pw_client_bst, FILE *pwlog);
+int pw_client_bst_batchsend(struct bst *pw_client_bst,
+                            FILE *pwlog,
+                            const size_t numcfgline);
 /*Used for the server to communicate with all its clients*/
 
 
