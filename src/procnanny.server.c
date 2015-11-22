@@ -11,7 +11,7 @@
 
 #include "bst.h"
 #include "cfgparser.h"
-#include "procwatch.h"
+#include "procserver.h"
 #include "pwlog.h"
 #include "pwwrapper.h"
 

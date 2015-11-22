@@ -7,7 +7,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "procwatch.h"
+#include "procserver.h"
 #include "pwlog.h"
 #include "pwwrapper.h"
 

@@ -17,7 +17,8 @@
 
 #include "bst.h"
 #include "cfgparser.h"
-#include "procwatch.h"
+#include "procclient.h"
+#include "procserver.h"
 #include "pwlog.h"
 #include "pwwrapper.h"
 
@@ -203,7 +204,7 @@ int bst_destroy(struct bst **current_bst)
         memset(writebuf, 0, PW_CHILD_READ_SIZE);
         pid_t *pid_ptr = (pid_t *)writebuf;
         *pid_ptr  = -1;
-        ssize_t tmp = 0;
+        ssize_t tmp __attribute__((unused)) = 0;
 
         while (NULL != tmp_ptr) {
                 if (NULL != tmp_ptr->link[BST_LEFT]) {

@@ -28,15 +28,10 @@
 
 #include "memwatch.h"
 
-const char *configname                    = NULL;
-size_t num_killed                         = 0;
 /*pw_pid_bst is used for storing struct pw_pid_info*/
 static struct bst *pw_pid_bst             = NULL;
 /*pw_idle_bst is used for storing the info of idle children*/
 static struct bst *pw_idle_bst            = NULL;
-static FILE *pwlog                        = NULL;
-static volatile sig_atomic_t sig_hup_flag = false;
-static volatile sig_atomic_t sig_int_flag = false;
 
 void procwatch(const char *const cfgname)
 {

@@ -22,7 +22,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "procwatch.h"
 #include "pwwrapper.h"
 
 #include "memwatch.h"

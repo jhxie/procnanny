@@ -38,6 +38,19 @@ enum {
         PW_LINEBUF_SIZE       = 1024,
 };
 
+struct pw_pid_info {
+        enum {
+                INFO_STARTUP, INFO_INIT, INFO_NOEXIST,
+                INFO_REPORT, INFO_REREAD, ACTION_KILL
+        } type;
+        pid_t watched_pid;
+        pid_t child_pid;
+        unsigned cwait_threshold;
+        unsigned pwait_threshold;
+        char process_name[PW_LINEBUF_SIZE];
+        int ipc_fdes[2];
+};
+
 void procclean(void);
 void data_write(int fd, const void *buf, size_t n);
 void data_read(int fd, void *buf, size_t n);

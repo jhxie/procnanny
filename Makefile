@@ -7,7 +7,9 @@ BINSDIR       := ./bin
 SERVERSRCS    := ./src/procnanny.server.c ./src/bst.c ./src/cfgparser.c \
 		./src/pwlog.c ./src/pwwrapper.c ./src/memwatch.c
 SERVEROBJS    := $(SERVERSRCS:.c=.o)
-CLIENTSRCS    := ./src/procnanny.client.c
+CLIENTSRCS    := ./src/procnanny.client.c ./src/bst.c ./src/pwwrapper.c \
+		./src/memwatch.c
+CLIENTOBJS    := $(CLIENTSRCS:.c=.o)
 
 all: $(BINSDIR)/procnanny.server #$(BINSDIR)/procnanny.client
 
