@@ -104,12 +104,12 @@ void pwlog_write(FILE *pwlog, struct pw_pid_info *loginfo, const char *chost)
                 break;
         case INFO_REREAD:
                 fprintf(pwlog,
-                        "  Info: Caught SIGHUP. "
+                        " Info: Caught SIGHUP. "
                         "Configuration file \'%s\' re-read.\n",
                         configname);
                 fputs_or_die(timestr, stdout);
                 fprintf(stdout,
-                        "  Info: Caught SIGHUP. "
+                        " Info: Caught SIGHUP. "
                         "Configuration file \'%s\' re-read.\n",
                         configname);
                 break;
