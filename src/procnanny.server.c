@@ -82,14 +82,13 @@ static void procserver(void)
         pwlog_write(pwlog, &((struct pw_pid_info){
                              .type = INFO_STARTUP}), NULL);
 
-        while (fdset_check(listen_sockfd, &readset)) {
-                
+        do {
                 if (true == sig_int_flag) {
                         sig_int_flag = false;
                         pw_client_bst_report(pw_client_bst, pwlog);
                         break;
                 }
-        }
+        } while (fdset_check(listen_sockfd, &readset));
 
         close_or_die(listen_sockfd);
         fclose_or_die(pwlog);
@@ -143,6 +142,12 @@ static bool fdset_check(const int listen_sockfd, fd_set *readset)
                         pw_client_bst_report(pw_client_bst, pwlog);
                         return false;
                 }
+                /*
+                 *If a SIGHUP signal is received, ensure that the newly
+                 *connected client would receive the updated configuration;
+                 *the new configuration is broadcasted to all the connected
+                 *clients as well.
+                 */
                 if (true == sig_hup_flag) {
                         sig_hup_flag = false;
                         memset(pw_cfg_vector, 0, sizeof pw_cfg_vector);
