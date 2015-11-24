@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include "bst.h"
+#include "bstserver.h"
 #include "cfgparser.h"
 #include "procserver.h"
 #include "pwlog.h"

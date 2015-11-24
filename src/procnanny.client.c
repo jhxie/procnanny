@@ -19,6 +19,7 @@
 #include <unistd.h>
 
 #include "bst.h"
+#include "bstclient.h"
 /*
  *Note even though the cfgparser header is used, the client code
  *does not link to cfgparser object file because client is NEVER
@@ -110,6 +111,7 @@ int main(int argc, char *argv[])
          *printf("%d\n", ntohl(MAGIC));
          *puts("reached");
          */
+        procwatch();
         close_or_die(server_sockfd);
         return EXIT_SUCCESS;
 }
@@ -120,13 +122,19 @@ static void procwatch(void)
          *Initialize the file descriptor set to contain the
          *socket descriptor of server
          */
-        struct timespec ts = {
-                .tv_sec  = 0,
-                .tv_nsec = 0
-        };
         fd_set chkset;
+        fd_set tmpset;
         FD_ZERO(&chkset);
         FD_SET(server_sockfd, &chkset);
+        struct timespec ts = {
+                .tv_sec  = 5,
+                .tv_nsec = 0
+        };
+        sigset_t select_mask;
+        sigfillset_or_die(&select_mask);
+        struct pw_cfg_info *cfg_iterator = NULL;
+        int numdes;
+        size_t numcfgline;
         pw_pid_bst = bst_init();
         pw_idle_bst = bst_init();
 
@@ -144,40 +152,66 @@ static void procwatch(void)
         data_read(server_sockfd, client_cfg_vector, sizeof client_cfg_vector);
 
         while (true) {
-                for (struct pw_cfg_info *cfg_iterator = client_cfg_vector;
+                for (cfg_iterator = client_cfg_vector, numcfgline = 0;
                      '\0' != cfg_iterator->process_name[0] &&
                      0 != cfg_iterator->wait_threshold;
                      ++cfg_iterator) {
                         work_dispatch(cfg_iterator, &chkset);
                 }
                 /*
-                 *for (size_t i = 0; i < numcfgline; ++i) {
-                 *        work_dispatch(&pw_cfg_vector[i]);
-                 *}
+                 *A SIGINT signal is received at server's side.
                  */
-                int numdes = pselect(getdtablesize(), &chkset, NULL, NULL,
-                sleep(5U);
-                /*pw_pid_bst_interval_add(pw_pid_bst, 5U);*/
-                pw_pid_bst_refresh(pw_pid_bst, pw_idle_bst, pwlog);
-                if (true == sig_int_flag) {
-                        sig_int_flag = false;
-                        /*make full use of the compound literals*/
-                        pwlog_write(pwlog,
-                                    &((struct pw_pid_info){
-                                      .type = INFO_REPORT }));
+                if (0 == numcfgline) {
                         break;
                 }
-                if (true == sig_hup_flag) {
-                        sig_hup_flag = false;
-                        cfg_resent = true;
-                        numcfgline = config_parse(cfgname);
-                        pwlog_write(pwlog,
-                                    &((struct pw_pid_info){
-                                      .type = INFO_REREAD }));
+                tmpset = chkset;
+                numdes = pselect(getdtablesize(), &tmpset,
+                                 NULL, NULL, &ts, &select_mask);
+                switch (numdes) {
+                /*
+                 *Since the pselect() cannot be interrupted by a signal
+                 *if the return value is -1, there must be some error occur.
+                 */
+                case -1:
+                        perror("pselect()");
+                        exit(EXIT_FAILURE);
+                /*
+                 *A 5 second timeout occurred and no file descriptors are
+                 *available yet.
+                 */
+                case 0:
+                        break;
+                default:
+                        /*A SIGHUP/SIGINT signal is received at server's side.*/
+                        if (FD_ISSET(server_sockfd, &tmpset)) {
+                                data_read(server_sockfd,
+                                          client_cfg_vector,
+                                          sizeof client_cfg_vector);
+                                FD_CLR(server_sockfd, &tmpset);
+                        }
+                        pw_pid_bst_refresh(pw_pid_bst,
+                                           pw_idle_bst,
+                                           &tmpset,
+                                           server_sockfd);
                 }
+                /*
+                 *if (true == sig_int_flag) {
+                 *        sig_int_flag = false;
+                 *        pwlog_write(pwlog,
+                 *                    &((struct pw_pid_info){
+                 *                      .type = INFO_REPORT }));
+                 *        break;
+                 *}
+                 *if (true == sig_hup_flag) {
+                 *        sig_hup_flag = false;
+                 *        cfg_resent = true;
+                 *        numcfgline = config_parse(cfgname);
+                 *        pwlog_write(pwlog,
+                 *                    &((struct pw_pid_info){
+                 *                      .type = INFO_REREAD }));
+                 *}
+                 */
         }
-
-        fclose_or_die(pwlog);
 }
 
 static void work_dispatch(const struct pw_cfg_info *cfginfo, fd_set *chksetptr)

@@ -1,15 +1,34 @@
 #ifndef BST_H_
 #define BST_H_
 
+/*
+ *Since part III the actual definition of bst_node_ is moved to this public
+ *header to avoid link time errors since both the client and server rely
+ *on bst; it is better to keep the definition of type specific bst functions
+ *into separate source files.
+ */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
-#include <sys/select.h>
 
 /*
  *No typedef for struct bst_node_ to avoid collision with other headers:
  *noteably link in <unistd.h>.
  */
+enum bst_link_dir { BST_LEFT, BST_RIGHT, BST_LINKSIZE };
+
+struct bst_node_ {
+        long key;
+        void *memblk;
+        /*
+         *Unlike the implementation of castack, here I use 2 separate fields
+         *to store the size of the memory block.
+         */
+        size_t blknum;  /* number of blocks */
+        size_t blksize; /* size of each block */
+        struct bst_node_ *link[BST_LINKSIZE]; /* child pointer */
+};
+
 struct bst {
         struct bst_node_ *root;
         size_t numnode;
@@ -30,24 +49,6 @@ void *bst_add(struct bst *current_bst, long key, size_t blknum, size_t blksize)
 long bst_rootkey(struct bst *current_bst);
 int bst_del(struct bst *current_bst, long key);
 int bst_destroy(struct bst **current_bst, enum bst_type type);
-
-
-/*Used for all the clients to communicate with their children processes*/
-int pw_pid_bst_interval_add(struct bst *current_bst, unsigned ival);
-int pw_pid_bst_refresh(struct bst *pw_pid_bst,
-                       struct bst *pw_idle_bst,
-                       FILE *pwlog);
-/*Used for all the clients to communicate with their children processes*/
-
-
-/*Used for the server to communicate with all its clients*/
-int pw_client_bst_batchlog(struct bst *pw_client_bst,
-                           const fd_set *pw_clientset,
-                           FILE *pwlog);
-int pw_client_bst_report(struct bst *pw_client_bst, FILE *pwlog);
-int pw_client_bst_batchsend(struct bst *pw_client_bst, FILE *pwlog);
-/*Used for the server to communicate with all its clients*/
-
 
 static inline bool bst_isempty(struct bst *current_bst)
         __attribute__((always_inline));
