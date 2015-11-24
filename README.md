@@ -45,3 +45,6 @@ TA Name:             Luke Nitish Kumar
 
 7.The server and all its clients have the same endianness; in other words,
   the data sent through the socket is not serialized.
+
+8.Both SIGINT and SIGHUP signals cannot be sent to the server process before
+  the handlers are successfully set up.
