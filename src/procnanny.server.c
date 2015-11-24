@@ -63,7 +63,7 @@ static void procserver(void)
 {
         pwlog = pwlog_setup();
         memset(pw_cfg_vector, 0, sizeof pw_cfg_vector);
-        size_t numcfgline = config_parse(configname);
+        config_parse(configname);
         int listen_sockfd = socket_or_die(AF_INET, SOCK_STREAM, 0);
         struct sockaddr_in server_sockaddr = {
                 .sin_family = AF_INET,
@@ -82,18 +82,12 @@ static void procserver(void)
         pwlog_write(pwlog, &((struct pw_pid_info){
                              .type = INFO_STARTUP}), NULL);
 
-        while (true) {
-                fdset_check(listen_sockfd, &readset);
+        while (fdset_check(listen_sockfd, &readset)) {
+                
                 if (true == sig_int_flag) {
                         sig_int_flag = false;
                         pw_client_bst_report(pw_client_bst, pwlog);
                         break;
-                }
-                if (true == sig_hup_flag) {
-                        sig_hup_flag = false;
-                        memset(pw_cfg_vector, 0, sizeof pw_cfg_vector);
-                        numcfgline = config_parse(configname);
-                        pw_client_bst_batchsend(pw_client_bst,pwlog);
                 }
         }
 
@@ -101,7 +95,7 @@ static void procserver(void)
         fclose_or_die(pwlog);
 }
 
-static void fdset_check(const int listen_sockfd, fd_set *readset)
+static bool fdset_check(const int listen_sockfd, fd_set *readset)
 {
         /*
          *This temporary file descriptor set is used to feed pselect():
@@ -111,6 +105,7 @@ static void fdset_check(const int listen_sockfd, fd_set *readset)
         fd_set tmpset = *readset;
         sigset_t mask;
         int numdes;
+        int saveerr;
         sigfillset_or_die(&mask);
         sigdelset_or_die(&mask, SIGINT);
         sigdelset_or_die(&mask, SIGHUP);
@@ -126,16 +121,39 @@ static void fdset_check(const int listen_sockfd, fd_set *readset)
                 errno = 0;
                 numdes = pselect(getdtablesize(), &tmpset,
                                  NULL, NULL, NULL, &mask);
+                saveerr = errno;
 
-                if (-1 == numdes && EINTR != errno) {
+                if (-1 == numdes && EINTR != saveerr) {
                         perror("pselect()");
                         exit(EXIT_FAILURE);
                 }
-        } while (-1 == numdes && EINTR == errno);
+                /*
+                 *If the pselect() call is interrupted by a signal,
+                 *then the only 2 possible scenarios that could lead
+                 *to here is the arrival of SIGINT or SIGHUP signal.
+                 *
+                 *Note that we return immediately only if the pselect() call
+                 *is interruptted by SIGINT; otherwise we leave it to check
+                 *in the main loop of procserver() because there may be
+                 *information of logs sent from clients and the server should
+                 *not ignore them before it terminates.
+                 */
+                if (true == sig_int_flag && -1 == numdes && EINTR == saveerr) {
+                        sig_int_flag = false;
+                        pw_client_bst_report(pw_client_bst, pwlog);
+                        return false;
+                }
+                if (true == sig_hup_flag) {
+                        sig_hup_flag = false;
+                        memset(pw_cfg_vector, 0, sizeof pw_cfg_vector);
+                        config_parse(configname);
+                        pw_client_bst_batchsend(pw_client_bst,pwlog);
+                }
+        } while (-1 == numdes && EINTR == saveerr);
 
         switch (numdes) {
         case 0: /*No descriptors are available for reading*/ 
-                return;
+                return true;
         default:
                 if (FD_ISSET(listen_sockfd, &tmpset)) {
                         /*
@@ -149,7 +167,7 @@ static void fdset_check(const int listen_sockfd, fd_set *readset)
                          *there is no need to call batchlog_write()
                          */
                         if (1 == numdes) {
-                                return;
+                                return true;
                         }
                         /*
                          *Excluding the listening socket itself
@@ -160,6 +178,7 @@ static void fdset_check(const int listen_sockfd, fd_set *readset)
                 }
                 pw_client_bst_batchlog(pw_client_bst, &tmpset, pwlog);
         }
+        return true;
 }
 
 static void clients_serve(const int listen_sockfd, fd_set *readset)
