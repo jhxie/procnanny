@@ -1,4 +1,5 @@
 #include <err.h>
+#include <errno.h>
 #include <netdb.h> /*definition for getnameinfo*/
 #include <netinet/in.h>
 #include <stdbool.h>
@@ -109,17 +110,30 @@ static void fdset_check(const int listen_sockfd, fd_set *readset)
          */
         fd_set tmpset = *readset;
         sigset_t mask;
+        int numdes;
         sigfillset_or_die(&mask);
+        sigdelset_or_die(&mask, SIGINT);
+        sigdelset_or_die(&mask, SIGHUP);
         /*
          *Let the pselect() block indefinitely as long as there is
          *no new incoming connection request or struct pw_pid_info from
-         *already connected clients.
+         *already connected clients;
+         *Except the case that the SIGINT or SIGHUP signal is delivered,
+         *which would interrupt the pselect() systemcall, so a restart
+         *is required.
          */
-        int numdes = pselect(getdtablesize(), &tmpset, NULL, NULL, NULL, &mask);
+        do {
+                errno = 0;
+                numdes = pselect(getdtablesize(), &tmpset,
+                                 NULL, NULL, NULL, &mask);
+
+                if (-1 == numdes && EINTR != errno) {
+                        perror("pselect()");
+                        exit(EXIT_FAILURE);
+                }
+        } while (-1 == numdes && EINTR == errno);
+
         switch (numdes) {
-        case -1:
-                perror("pselect()");
-                exit(EXIT_FAILURE);
         case 0: /*No descriptors are available for reading*/ 
                 return;
         default:

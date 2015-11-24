@@ -72,6 +72,7 @@ void pipe_or_die(int *pipefd);
 ssize_t write_or_die(int fd, const void *buf, size_t n);
 ssize_t read_or_die(int fd, void *buf, size_t n);
 void sigfillset_or_die(sigset_t *set);
+void sigdelset_or_die(sigset_t *set, int signo);
 void sigprocmask_or_die(int how, const sigset_t *set, sigset_t *oldset);
 void sigaction_or_die(int sig,
                       const struct sigaction *act,

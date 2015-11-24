@@ -246,6 +246,14 @@ ssize_t read_or_die(int fd, void *buf, size_t n)
         return val;
 }
 
+void sigdelset_or_die(sigset_t *set, int signo)
+{
+        if (-1 == sigdelset(set, signo)) {
+                perror("sigdelset()");
+                exit(EXIT_FAILURE);
+        }
+}
+
 void sigfillset_or_die(sigset_t *set)
 {
         if (-1 == sigfillset(set)) {
