@@ -42,3 +42,6 @@ TA Name:             Luke Nitish Kumar
   upon the success/failure of a monitored process.
 
 6.The server and clients cannot crash or be killed.
+
+7.The server and all its clients have the same endianness; in other words,
+  the data sent through the socket is not serialized.

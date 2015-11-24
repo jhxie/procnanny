@@ -108,13 +108,14 @@ static void fdset_check(const int listen_sockfd, fd_set *readset)
          *descriptor set.
          */
         fd_set tmpset = *readset;
-        struct timespec ts = {
-                .tv_sec = 0,
-                .tv_nsec = 0
-        };
         sigset_t mask;
         sigfillset_or_die(&mask);
-        int numdes = pselect(getdtablesize(), &tmpset, NULL, NULL, &ts, &mask);
+        /*
+         *Let the pselect() block indefinitely as long as there is
+         *no new incoming connection request or struct pw_pid_info from
+         *already connected clients.
+         */
+        int numdes = pselect(getdtablesize(), &tmpset, NULL, NULL, NULL, &mask);
         switch (numdes) {
         case -1:
                 perror("pselect()");

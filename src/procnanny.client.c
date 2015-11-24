@@ -120,6 +120,10 @@ static void procwatch(void)
          *Initialize the file descriptor set to contain the
          *socket descriptor of server
          */
+        struct timespec ts = {
+                .tv_sec  = 0,
+                .tv_nsec = 0
+        };
         fd_set chkset;
         FD_ZERO(&chkset);
         FD_SET(server_sockfd, &chkset);
@@ -151,6 +155,7 @@ static void procwatch(void)
                  *        work_dispatch(&pw_cfg_vector[i]);
                  *}
                  */
+                int numdes = pselect(getdtablesize(), &chkset, NULL, NULL,
                 sleep(5U);
                 /*pw_pid_bst_interval_add(pw_pid_bst, 5U);*/
                 pw_pid_bst_refresh(pw_pid_bst, pw_idle_bst, pwlog);
@@ -175,7 +180,7 @@ static void procwatch(void)
         fclose_or_die(pwlog);
 }
 
-static void work_dispatch(const struct pw_cfg_info *cfginfo, fd_set *chkset)
+static void work_dispatch(const struct pw_cfg_info *cfginfo, fd_set *chksetptr)
 {
         bool process_not_found = true;
         char linebuf[PW_LINEBUF_SIZE] = {};
@@ -208,8 +213,17 @@ static void work_dispatch(const struct pw_cfg_info *cfginfo, fd_set *chkset)
                         wpid_info.ipc_fdes[0] = idle_info_ptr->ipc_fdes[0];
                         wpid_info.ipc_fdes[1] = idle_info_ptr->ipc_fdes[1];
                         bst_del(pw_idle_bst, bst_rootkey(pw_idle_bst));
+                /*otherwise there is no idle children, create new processes*/
                 } else {
+                        /*
+                         *the read end(pipe1) of the child process needed to be
+                         *added to the chkset to be used in the future pselect()
+                         *calls; in other words, the pwait_threshold is no
+                         *longer needed in part III so that field is removed
+                         *from the struct pw_pid_info
+                         */
                         child_create(pidof_pipe, &wpid_info);
+                        FD_SET(wpid_info.ipc_fdes[0], chksetptr);
                 }
                 /*Parent pass the INFO_INIT log to server*/
                 wpid_info.type = INFO_INIT;
@@ -219,9 +233,9 @@ static void work_dispatch(const struct pw_cfg_info *cfginfo, fd_set *chkset)
         }
         if (true == process_not_found && true == cfg_resent) {
                 /*
-                 *Parent pass the INFO_NOEXIST log to server and make sure that
-                 *the INFO_NOEXIST only passes back upon configuration resend
-                 *(a.k.a SIGHUP received at server side)
+                 *Parent passes the INFO_NOEXIST log to server and make sure
+                 *that the INFO_NOEXIST only passes back upon configuration
+                 *resend (a.k.a SIGHUP received at server side)
                  */
                 cfg_resent = false;
                 wpid_info.type = INFO_NOEXIST;
