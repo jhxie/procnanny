@@ -1,5 +1,24 @@
 # procnanny
-Simple process monitor.
+A simple distributed process monitor.
+
+# Build/Install
+Type 'make' after you extract everything from the tarball distribution
+and the 2 executables would be generated in the 'bin' folder.
+
+# Usage
+For the server, please remember to export the 2 environment variables like
+the following before running the 'bin/procnanny.server' program:
+
+```bash
+export PROCNANNYSERVERINFO=./report
+export PROCNANNYLOGS=./log
+```
+
+and then run it as 'bin/procnanny.server [CONFIGURATION FILE]'.
+
+For the client, there is no need to export any environment variables,
+just simply run it as 'bin/procnanny.client [HOST NAME] 9898',
+where the '9898' is the predefined listening port number of the server.
 
 # Personal Info
 Name:                Jiahui Xie
