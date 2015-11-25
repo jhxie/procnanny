@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
         sigprocmask_or_die(SIG_SETMASK, &block_mask, NULL);
         /*Make stdout unbuffered.*/
         setbuf(stdout, NULL);
-        procclean();
+        procclean((enum pw_clean_type)PW_CLIENT_CLEAN);
 
         struct addrinfo server_info = {
                 .ai_family = AF_INET,
@@ -106,11 +106,6 @@ int main(int argc, char *argv[])
         }
         freeaddrinfo(host_list);
         host_list = NULL;
-        /*
-         *read_or_die(server_sockfd, &MAGIC, sizeof MAGIC);
-         *printf("%d\n", ntohl(MAGIC));
-         *puts("reached");
-         */
         procwatch();
         close_or_die(server_sockfd);
         return EXIT_SUCCESS;
@@ -155,9 +150,10 @@ static void procwatch(void)
                 for (cfg_iterator = client_cfg_vector, numcfgline = 0;
                      '\0' != cfg_iterator->process_name[0] &&
                      0 != cfg_iterator->wait_threshold;
-                     ++cfg_iterator) {
+                     ++cfg_iterator, ++numcfgline) {
                         work_dispatch(cfg_iterator, &chkset);
                 }
+                cfg_resent = false;
                 /*
                  *A SIGINT signal is received at server's side.
                  */
@@ -187,6 +183,7 @@ static void procwatch(void)
                                 data_read(server_sockfd,
                                           client_cfg_vector,
                                           sizeof client_cfg_vector);
+                                cfg_resent = true;
                                 FD_CLR(server_sockfd, &tmpset);
                         }
                         pw_pid_bst_refresh(pw_pid_bst,
@@ -194,23 +191,6 @@ static void procwatch(void)
                                            &tmpset,
                                            server_sockfd);
                 }
-                /*
-                 *if (true == sig_int_flag) {
-                 *        sig_int_flag = false;
-                 *        pwlog_write(pwlog,
-                 *                    &((struct pw_pid_info){
-                 *                      .type = INFO_REPORT }));
-                 *        break;
-                 *}
-                 *if (true == sig_hup_flag) {
-                 *        sig_hup_flag = false;
-                 *        cfg_resent = true;
-                 *        numcfgline = config_parse(cfgname);
-                 *        pwlog_write(pwlog,
-                 *                    &((struct pw_pid_info){
-                 *                      .type = INFO_REREAD }));
-                 *}
-                 */
         }
 }
 
@@ -271,7 +251,6 @@ static void work_dispatch(const struct pw_cfg_info *cfginfo, fd_set *chksetptr)
                  *that the INFO_NOEXIST only passes back upon configuration
                  *resend (a.k.a SIGHUP received at server side)
                  */
-                cfg_resent = false;
                 wpid_info.type = INFO_NOEXIST;
                 data_write(server_sockfd, &wpid_info, sizeof wpid_info);
                 /*pwlog_write(pwlog, &wpid_info);*/

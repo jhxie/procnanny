@@ -38,6 +38,11 @@ enum {
         PW_LINEBUF_SIZE       = 1024,
 };
 
+enum pw_clean_type {
+        PW_CLIENT_CLEAN,
+        PW_SERVER_CLEAN,
+};
+
 struct pw_pid_info {
         enum {
                 INFO_STARTUP, INFO_INIT, INFO_NOEXIST,
@@ -50,7 +55,7 @@ struct pw_pid_info {
         int ipc_fdes[2];
 };
 
-void procclean(void);
+int procclean(enum pw_clean_type clean_type);
 void data_write(int fd, const void *buf, size_t n);
 void data_read(int fd, void *buf, size_t n);
 

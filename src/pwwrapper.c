@@ -26,14 +26,34 @@
 
 #include "memwatch.h"
 
-void procclean(void)
+int procclean(enum pw_clean_type clean_type)
 {
+        const char *clean_pipe_str = NULL;
+
+        switch (clean_type) {
+        case PW_CLIENT_CLEAN:
+#ifdef NDEBUG
+                clean_pipe_str = "pidof -x procnanny.client | tr \' \' \'\n\'";
+#else
+                clean_pipe_str = "pidof -x procnanny.client_debug"
+                        " | tr \' \' \'\n\'";
+#endif
+                break;
+        case PW_SERVER_CLEAN:
+#ifdef NDEBUG
+                clean_pipe_str = "pidof -x procnanny.server | tr \' \' \'\n\'";
+#else
+                clean_pipe_str = "pidof -x procnanny.server_debug"
+                        " | tr \' \' \'\n\'";
+#endif
+                break;
+        default:
+                errno = EINVAL;
+                return -1;
+        }
         /*
          *ASSUMPTION: the length of a line is no more than 1023 characters
          */
-        static const char *const clean_pipe_str =
-                "pidof -x procnanny.server procnanny.client | "
-                "tr \' \' \'\n\'";
         FILE *clean_pipe              = popen_or_die(clean_pipe_str, "r");
         char linebuf[PW_LINEBUF_SIZE] = {};
         char *endptr                  = NULL;
@@ -53,6 +73,7 @@ void procclean(void)
                 }
         }
         pclose_or_die(clean_pipe);
+        return 0;
 }
 
 /*

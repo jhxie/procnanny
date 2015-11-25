@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
         sigaction_or_die(SIGINT, &sa, NULL);
         sigaction_or_die(SIGHUP, &sa, NULL);
         setbuf(stdout, NULL); /*Make stdout unbuffered.*/
-        procclean();
+        procclean((enum pw_clean_type)PW_SERVER_CLEAN);
         procserver();
 
         return EXIT_SUCCESS;

@@ -33,7 +33,7 @@ $(BINSDIR)/procnanny.server : server_objs
 
 server_objs : $(SERVERSRCS)
 	-rm -f $(SERVEROBJS)
-	$(CC) $(CFLAGS) $(MWFLAGS) $(INCFLAGS) -c $^ -O2
+	$(CC) $(CFLAGS) $(MWFLAGS) $(INCFLAGS) -DNDEBUG -c $^ -O2
 	-mv *.o $(SRCSDIR)
 
 $(BINSDIR)/procnanny.server_debug : server_debug_objs
@@ -53,7 +53,7 @@ $(BINSDIR)/procnanny.client : client_objs
 
 client_objs : $(CLIENTSRCS)
 	-rm -f $(CLIENTOBJS)
-	$(CC) $(CFLAGS) $(MWFLAGS) $(INCFLAGS) -c $^ -O2
+	$(CC) $(CFLAGS) $(MWFLAGS) $(INCFLAGS) -DNDEBUG -c $^ -O2
 	-mv *.o $(SRCSDIR)
 
 $(BINSDIR)/procnanny.client_debug : client_debug_objs

@@ -71,7 +71,7 @@ void *bst_add(struct bst *current_bst, long key, size_t blknum, size_t blksize)
         struct bst_node_ *bstnode = calloc_or_die(1, sizeof(struct bst_node_));
 
         if (SIZE_MAX == current_bst->numnode) {
-#ifdef BST_DEBUG
+#ifndef NDEBUG
                 const char *const err_msg = "bst: max node count reached\n";
                 write(STDERR_FILENO, err_msg, strlen(err_msg));
 #endif
