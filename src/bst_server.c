@@ -99,9 +99,9 @@ static void pw_client_bst_batchsend_helper(struct bst_node_ *root)
         if (NULL == root)
                 return;
 
-        pw_client_bst_batchlog_helper(root->link[BST_LEFT]);
+        pw_client_bst_batchsend_helper(root->link[BST_LEFT]);
         data_write((int)root->key, pw_cfg_vector, sizeof pw_cfg_vector);
-        pw_client_bst_batchlog_helper(root->link[BST_RIGHT]);
+        pw_client_bst_batchsend_helper(root->link[BST_RIGHT]);
 }
 
 int pw_client_bst_batchsend(struct bst *pw_client_bst, FILE *pwlog)
