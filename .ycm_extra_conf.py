@@ -39,8 +39,13 @@ flags = [
     '-DMEMWATCH',
     '-DMW_STDIO',
     '-I./src/include',
-    '-Wall',
     '-std=gnu99',
+    '-Wall',
+    '-Wextra',
+    '-ftrapv',
+    '-fsanitize=address,leak,undefined',
+    '-ggdb3',
+    '-pipe'
 ]
 
 

@@ -1,5 +1,5 @@
 CC            := gcc
-CFLAGS        := -Wall -std=gnu99
+CFLAGS        := -Wall -Wextra -std=gnu99 -ftrapv
 MWFLAGS       := -DMEMWATCH -DMW_STDIO
 INCFLAGS      := -I./src/include
 SRCSDIR       := ./src
@@ -25,6 +25,10 @@ clean:
 	-rm -f $(SRCSDIR)/*.o $(SRCSDIR)/*.gch \
 		$(BINSDIR)/{procnanny.server,procnanny.client} \
 		$(BINSDIR)/{procnanny.server_debug,procnanny.client_debug}
+
+cscope:
+	-rm -f cscope*
+	-cscope -RqI src/include/
 
 # Server
 $(BINSDIR)/procnanny.server : server_objs
@@ -65,7 +69,7 @@ client_debug_objs : $(CLIENTSRCS)
 	$(CC) $(CFLAGS) $(MWFLAGS) $(INCFLAGS) -c $^ -ggdb3 -O0
 	-mv *.o $(SRCSDIR)
 # Client
-.PHONY: all rebuild debug rebuild_debug clean \
+.PHONY: all rebuild debug rebuild_debug clean cscope \
 	server_objs server_debug_objs \
 	client_objs client_debug_objs
 .IGNORE:

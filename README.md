@@ -1,5 +1,5 @@
 # procnanny
-A simple distributed process monitor.
+A simple process monitor using the client-server model.
 
 # Build/Install
 Type 'make' after you extract everything from the tarball distribution
@@ -20,22 +20,15 @@ For the client, there is no need to export any environment variables,
 just simply run it as 'bin/procnanny.client [HOST NAME] 9898',
 where the '9898' is the predefined listening port number of the server.
 
-# Personal Info
-Name:                Jiahui Xie
+To generate the documentation, you need to have doxygen installed; even though
+the source code does not contain any doxygen formatting directives, you can
+still use the cross-reference feature of it to assist code reading:
+```bash
+doxygen Doxyfile
+```
+the resulting documentation would reside in doc folder.
 
-Student Number:      1372777
-
-Unix ID:             jxie2
-
-Lecture Section:     A1
-
-Instructor Name:     Paul Lu
-
-Lab Section:         D05
-
-TA Name:             Luke Nitish Kumar
-
-# ASSUMPTIONS
+# Assumptions
 1.The length of a line is no more than 1023 characters.
   The reason for using a statically allocated array rather than
   something like getline() is that memwatch cannot detect the memory
@@ -67,3 +60,10 @@ TA Name:             Luke Nitish Kumar
 
 8.Both SIGINT and SIGHUP signals cannot be sent to the server process before
   the handlers are successfully set up.
+
+# License
+Copyright &copy; 2015 - 2016 Jiahui Xie
+Licensed under the [BSD 2-Clause License][BSD2].
+Distributed under the [BSD 2-Clause License][BSD2].
+
+[BSD2]: https://opensource.org/licenses/BSD-2-Clause
