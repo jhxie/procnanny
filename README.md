@@ -62,7 +62,7 @@ the resulting documentation would reside in doc folder.
   the handlers are successfully set up.
 
 # License
-Copyright &copy; 2015 - 2016 Jiahui Xie
+Copyright &copy; 2015 Jiahui Xie
 Licensed under the [BSD 2-Clause License][BSD2].
 Distributed under the [BSD 2-Clause License][BSD2].
 
